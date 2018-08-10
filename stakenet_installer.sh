@@ -17,6 +17,8 @@ FILE_NAME='xsn-1.0.14'
 ISSYNCED='mnsync status'
 BLOCKCHAININFO='getblockchaininfo'
 
+#Global variables
+NODE_IP=""
 
 function doFullMasternode() {
   clear
@@ -123,13 +125,15 @@ function coreConfiguration() {
   echo -e ""
   echo -e "We need some information: "
   echo -e "============================================================="
-  echo -e "Enter your external VPS IPv4 adress"
-  read -rp "Use the following scheme XXX.XXX.XXX.XXX: " VPSIP
-  echo -e "============================================================="
   echo -e "Enter your $COIN_NAME Masternode GEN Key."
   echo -e "Please start your local wallet and go to"
   echo -e "Tools -> Debug Console and type masternode genkey"
   read -rp "Copy the string here: " MNKEY
+  echo -e "============================================================="
+  #echo -e "Enter your external VPS IPv4 adress"
+  #read -rp "Use the following scheme XXX.XXX.XXX.XXX: " VPSIP
+  getIP
+  echo -e "Using IP Address $NODE_IP"
 
 cat << EOF > $(eval echo $CONFIGFOLDER/$CONFIG_FILE)
 
@@ -145,7 +149,7 @@ cat << EOF > $(eval echo $CONFIGFOLDER/$CONFIG_FILE)
   #----
   masternode=1
   masternodeprivkey=$MNKEY
-  externalip=$VPSIP
+  externalip=$NODE_IP
   #----
 
 EOF
@@ -194,31 +198,25 @@ function printInformationDuringSync() {
 
 
 function getIP() {
-  #foundAddr=$( eval ip addr | grep -Eo 'inet (addr:)?([0-9]*\.){3}[0-9]*' | grep -Eo '([0-9]*\.){3}[0-9]*' | grep -v '127.0.0.1')
-  #echo -e $foundAddr
+  foundAddr=$( eval ifconfig | grep -Eo 'inet (addr:)?([0-9]*\.){3}[0-9]*' | grep -Eo '([0-9]*\.){3}[0-9]*' | grep -v '127.0.0.1')
 
-  foundAddr="192.168.0.11.5.8.1"
-  echo -e $foundAddr
+  if [[ "$foundAddr" = *$'\n'* ]]; then
+    echo -e "More than one IP address found"
+    echo -e "Select the one you want to use"
 
-  if [[ $foundAddr != "[[:space:]]+" ]]; then
-    echo "string contains one more spaces"
+    select option in $foundAddr
+    do
+       case "$option" in
+          End)  echo "End"; break ;;
+            "")  echo "Invalid selection" ;;
+             *)  NODE_IP="$option"
+                 break
+       esac
+    done
   else
-    echo "string doesn't contain spaces"
+      echo "Found IP Address $foundAddr"
+      NODE_IP="$foundAddr"
   fi
-
-  echo -e "More than one IP address found"
-  echo -e "Which one should be used?"
-
-  select option in $foundAddr
-  do
-     case "$option" in
-        End)  echo "End"; break ;;
-          "")  echo "Invalid selection" ;;
-           *)  echo "You have chosen $option!"
-     esac
-  done
-
-  return $foundAddr
 }
 
 function checks() {
@@ -273,4 +271,4 @@ function menu() {
    esac
 }
 
-getIP
+menu
