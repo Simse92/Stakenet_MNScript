@@ -18,7 +18,7 @@ COIN_PORT=62583
 COIN_GIT='https://github.com/X9Developers/XSN/releases/download/v1.0.14/xsn-1.0.14-linux64.tar.gz'
 FILE_NAME_TAR='xsn-1.0.14-linux64.tar.gz'
 FILE_NAME='xsn-1.0.14'
-WALLET_VER='159900'
+WALLET_VER='1001400'
 
 BOOTSTRAP_LINK='https://github.com/X9Developers/XSN/releases/download/v1.0.13/bootstrap.dat.zip'
 BOOTSTRAP_ZIP_NAME='bootstrap.dat.zip'
@@ -27,7 +27,7 @@ BOOTSTRAP_FILE_NAME='bootstrap.dat'
 #Importand commands
 ISSYNCED='mnsync status'
 BLOCKCHAININFO='getblockchaininfo'
-WALLETINFO='getwalletinfo'
+WALLETINFO='getnetworkinfo'
 
 #Global variables
 NODE_IP=""
@@ -77,9 +77,9 @@ function backupData() {
 }
 
 function checkWalletVersion() {
-  walletVersion=$( ($CONFIGFOLDER/$COIN_CLIENT $WALLETINFO |grep 'walletversion'|awk '{ print $2 }') )
+  walletVersion=$( ($CONFIGFOLDER/$COIN_CLIENT $WALLETINFO |grep -m1 'version'|awk '{ print $2 }') )
   if [[ ${walletVersion::-1} = $WALLET_VER ]]; then
-    echo -e "You are already running the latest XSN-Core."
+    echo -e "You are already running the latest XSN-Core.."
     exit
   fi
   # TODO Oder Wallet Version konnte nicht abgefragt werden
@@ -250,14 +250,18 @@ function printInformationDuringSync() {
   do
     actBlock=$( ($CONFIGFOLDER/$COIN_CLIENT $BLOCKCHAININFO |grep 'blocks'|awk '{ print $2 }') )
     maxBlock=$( ($CONFIGFOLDER/$COIN_CLIENT $BLOCKCHAININFO |grep 'headers'|awk '{ print $2 }') )
+    numCon=$( ($CONFIGFOLDER/$COIN_CLIENT $WALLETINFO |grep 'connections'|awk '{ print $2 }') )
 
-    echo -e "════════════════════════════"
-    echo -e "SYNC"
-    #echo -e "Time $"
+    echo -e "═══════════════════════════"
+    echo -e "Synchronisation"
+    echo -n "Time: "
+    date
+    echo -e "Number of connections: ${numCon::-1}"
     echo -e "Sync status: ${syncStatus::-1}"
     echo -e "Block progress: ${actBlock::-1}/${maxBlock::-1}"
+    echo -e "═══════════════════════════"
 
-    sleep 10
+    sleep 5
     syncStatus=$( ($CONFIGFOLDER/$COIN_CLIENT $ISSYNCED |grep 'IsSynced'|awk '{ print $2 }') )
   done
   echo -e "Sync finished!"
