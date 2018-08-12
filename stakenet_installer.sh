@@ -40,6 +40,7 @@ function doFullMasternode() {
   enable_firewall
   downloadInstallNode
   coreConfiguration
+  addBootstrap
   startXsnDaemon
   printInformationDuringSync
 }
@@ -49,9 +50,9 @@ function doUpdateMasternode {
   backupData
   checkWalletVersion
   stopAndDelOldDaemon
-  addBootstrap
   downloadInstallNode
   recoverBackup
+  addBootstrap
   startXsnDaemon
   printInformationDuringSync
 }
@@ -308,25 +309,27 @@ function installBootstrap() {
     echo -e "Failed to download $BOOTSTRAP_FILE_NAME"
   else
     unzip -j $BOOTSTRAP_ZIP_NAME* $BOOTSTRAP_FILE_NAME -d $CONFIGFOLDER
+    if [ $? -ne 0 ]
+    then
+      echo -e "Failed to unzip $BOOTSTRAP_ZIP_NAME"
+    else
+      rm -rf $BOOTSTRAP_ZIP_NAME*
+      rm -rf $CONFIGFOLDER/blocks
+      rm -rf $CONFIGFOLDER/chainstate
+      rm -rf $CONFIGFOLDER/peers.dat
 
-    rm -rf $BOOTSTRAP_ZIP_NAME*
-    rm -rf $CONFIGFOLDER/blocks
-    rm -rf $CONFIGFOLDER/chainstate
-    rm -rf $CONFIGFOLDER/peers.dat
-
-    echo -e "Successfully installed bootstrap"
+      echo -e "Successfully installed bootstrap"
+    fi
   fi
 }
 
 function addBootstrap() {
   checkBootstrap
   bootstrapCheck=$?
-  if [[ $bootstrapCheck == 1 ]]
+  if [[ $bootstrapCheck != 0 ]]
   then
     echo -e "Installing bootstrap"
     installBootstrap
-  else
-    echo -e "Bootstrap already installed, fine"
   fi
 }
 
