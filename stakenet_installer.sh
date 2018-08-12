@@ -1,6 +1,7 @@
 #!/bin/bash
 
 SCRIPTVER=1.0.0
+
 COIN_NAME='XSN'
 CONFIG_FILE='xsn.conf'
 CONFIGFOLDER="$HOME/.xsncore"
@@ -12,6 +13,7 @@ COIN_PORT=62583
 COIN_GIT='https://github.com/X9Developers/XSN/releases/download/v1.0.14/xsn-1.0.14-linux64.tar.gz'
 FILE_NAME_TAR='xsn-1.0.14-linux64.tar.gz'
 FILE_NAME='xsn-1.0.14'
+WALLET_VER='159900'
 
 BOOTSTRAP_LINK='https://github.com/X9Developers/XSN/releases/download/v1.0.13/bootstrap.dat.zip'
 BOOTSTRAP_FILE_NAME='bootstrap.dat'
@@ -19,6 +21,7 @@ BOOTSTRAP_FILE_NAME='bootstrap.dat'
 #Importand commands
 ISSYNCED='mnsync status'
 BLOCKCHAININFO='getblockchaininfo'
+WALLETINFO='getwalletinfo'
 
 #Global variables
 NODE_IP=""
@@ -33,6 +36,59 @@ function doFullMasternode() {
   coreConfiguration
   startXsnDaemon
   printInformationDuringSync
+}
+
+function doUpdateMasternode {
+  clear
+  backupData
+  checkWalletVersion
+  stopAndDelOldDaemon
+  addBootstrap
+  downloadInstallNode
+  recoverBackup
+  startXsnDaemon
+  printInformationDuringSync
+}
+
+function backupData() {
+  if [[ -f $( eval echo "$CONFIGFOLDER/wallet.dat" ) ]]; then
+    echo -e "Found existing xsncore, making backup"
+
+    if [[ ! -d $( eval echo "$COIN_BACKUP" ) ]]; then
+      mkdir $( eval echo $COIN_BACKUP )
+    fi
+
+    cp $( eval echo $CONFIGFOLDER/xsn.conf $COIN_BACKUP ) #2> /dev/null
+    cp $( eval echo $CONFIGFOLDER/wallet.dat $COIN_BACKUP ) #2> /dev/null
+
+  else
+    echo -e "No $COIN_NAME install found"
+    echo -e "Do you want a full Masternode install?"
+    menu
+  fi
+}
+
+function checkWalletVersion() {
+  walletVersion=$( ($CONFIGFOLDER/$COIN_CLIENT $WALLETINFO |grep 'walletversion'|awk '{ print $2 }') )
+  if [[ ${walletVersion::-1} = $WALLET_VER ]]; then
+    echo -e "You are already running the latest XSN-Core."
+    menu
+  fi
+  # TODO Oder Wallet Version konnte nicht abgefragt werden
+  echo -e "Starting Update"
+}
+
+function stopAndDelOldDaemon() {
+  #stop xsn-daemon
+  #TODO Check ob der Prozess überhaut läuft
+  $CONFIGFOLDER/$COIN_CLIENT stop #2> /dev/null
+  rm -rf $CONFIGFOLDER/$COIN_CLIENT #> /dev/null 2>&1
+  rm -rf $CONFIGFOLDER/$COIN_DAEMON #> /dev/null 2>&1
+}
+
+function recoverBackup() {
+  cp $( eval echo $COIN_BACKUP/xsn.conf $CONFIGFOLDER ) #2> /dev/null
+  cp $( eval echo $COIN_BACKUP/wallet.dat $CONFIGFOLDER ) #2> /dev/null
 }
 
 function installDependencies() {
@@ -250,7 +306,7 @@ function installBootstrap() {
   fi
 }
 
-function addBottstrap() {
+function addBootstrap() {
   checkBootstrap
   bootstrapCheck=$?
   if [[ $bootstrapCheck == 1 ]]
@@ -314,4 +370,4 @@ function menu() {
    esac
 }
 
-addBottstrap
+menu
