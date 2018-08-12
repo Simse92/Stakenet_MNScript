@@ -78,12 +78,26 @@ function backupData() {
 }
 
 function checkWalletVersion() {
+
+  wasStarted=0
+  if [[ -z "$(ps axo cmd:100 | egrep $COIN_DAEMON | grep ^[^grep])" ]]; then
+    echo -e "Starting daemon to check version..."
+    wasStarted=1
+    startXsnDaemon
+  fi
+
   walletVersion=$( ($CONFIGFOLDER/$COIN_CLIENT $WALLETINFO |grep -m1 'version'|awk '{ print $2 }') )
+
+  if [[ $wasStarted = 1 ]]; then
+    echo -e "Shutting daemon down again"
+    $CONFIGFOLDER/$COIN_CLIENT stop
+  fi
+
   if [[ ${walletVersion::-1} = $WALLET_VER ]]; then
     echo -e "You are already running the latest XSN-Core.."
     exit
   fi
-  # TODO Oder Wallet Version konnte nicht abgefragt werden
+
   echo -e "Starting Update"
 }
 
@@ -386,4 +400,4 @@ function menu() {
    esac
 }
 
-menu
+checkWalletVersion
