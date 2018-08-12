@@ -14,6 +14,7 @@ FILE_NAME_TAR='xsn-1.0.14-linux64.tar.gz'
 FILE_NAME='xsn-1.0.14'
 
 BOOTSTRAP_LINK='https://github.com/X9Developers/XSN/releases/download/v1.0.13/bootstrap.dat.zip'
+BOOTSTRAP_ZIP_NAME='bootstrap.dat.zip'
 BOOTSTRAP_FILE_NAME='bootstrap.dat'
 
 #Importand commands
@@ -237,11 +238,11 @@ function installBootstrap() {
   wget $BOOTSTRAP_LINK
   if [ $? -ne 0 ]
   then
-    echo -e "Failed to download $FILE_NAME"
+    echo -e "Failed to download $BOOTSTRAP_FILE_NAME"
   else
-    unzip $BOOTSTRAP_FILE_NAME -d $CONFIGFOLDER
+    unzip -j $BOOTSTRAP_ZIP_NAME* $BOOTSTRAP_FILE_NAME -d $CONFIGFOLDER
 
-    rm -rf $BOOTSTRAP_FILE_NAME
+    rm -rf $BOOTSTRAP_ZIP_NAME*
     rm -rf $CONFIGFOLDER/blocks
     rm -rf $CONFIGFOLDER/chainstate
     rm -rf $CONFIGFOLDER/peers.dat
