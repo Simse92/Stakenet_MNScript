@@ -13,6 +13,9 @@ COIN_GIT='https://github.com/X9Developers/XSN/releases/download/v1.0.14/xsn-1.0.
 FILE_NAME_TAR='xsn-1.0.14-linux64.tar.gz'
 FILE_NAME='xsn-1.0.14'
 
+BOOTSTRAP_LINK='https://github.com/X9Developers/XSN/releases/download/v1.0.13/bootstrap.dat.zip'
+BOOTSTRAP_FILE_NAME='bootstrap.dat'
+
 #Importand commands
 ISSYNCED='mnsync status'
 BLOCKCHAININFO='getblockchaininfo'
@@ -219,6 +222,46 @@ function getIP() {
   fi
 }
 
+function checkBootstrap() {
+  if [ -f $CONFIGFOLDER/$BOOTSTRAP_FILE_NAME* ]
+  then
+    echo -e "Bootstrap already installed"
+    return 0
+  else
+    echo -e "Bootstrap not found"
+    return 1
+  fi
+}
+
+function installBootstrap() {
+  wget $BOOTSTRAP_LINK
+  if [ $? -ne 0 ]
+  then
+    echo -e "Failed to download $FILE_NAME"
+  else
+    unzip $BOOTSTRAP_FILE_NAME -d $CONFIGFOLDER
+
+    rm -rf $BOOTSTRAP_FILE_NAME
+    rm -rf $CONFIGFOLDER/blocks
+    rm -rf $CONFIGFOLDER/chainstate
+    rm -rf $CONFIGFOLDER/peers.dat
+
+    echo -e "Successfully installed bootstrap"
+  fi
+}
+
+function addBottstrap() {
+  checkBootstrap
+  bootstrapCheck=$?
+  if [[ $bootstrapCheck == 1 ]]
+  then
+    echo -e "Installing bootstrap"
+    installBootstrap
+  else
+    echo -e "Do nothing"
+  fi
+}
+
 function checks() {
   if [[ $( lsb_release -d ) != *16.04* ]]; then
     echo -e "You are not running Ubuntu 16.04. Installation is cancelled."
@@ -271,4 +314,4 @@ function menu() {
    esac
 }
 
-menu
+addBottstrap
