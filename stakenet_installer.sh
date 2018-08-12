@@ -27,7 +27,8 @@ BOOTSTRAP_FILE_NAME='bootstrap.dat'
 #Importand commands
 ISSYNCED='mnsync status'
 BLOCKCHAININFO='getblockchaininfo'
-WALLETINFO='getnetworkinfo'
+NETWORKINFO='getnetworkinfo'
+WALLETINFO='getwalletinfo'
 
 #Global variables
 NODE_IP=""
@@ -40,7 +41,7 @@ function doFullMasternode() {
   enable_firewall
   downloadInstallNode
   coreConfiguration
-  addBootstrap
+  #addBootstrap
   startXsnDaemon
   printInformationDuringSync
 }
@@ -54,7 +55,7 @@ function doUpdateMasternode {
     stopAndDelOldDaemon
     downloadInstallNode
     recoverBackup
-    addBootstrap
+    #addBootstrap
     startXsnDaemon
     printInformationDuringSync
   else
@@ -91,7 +92,7 @@ function checkWalletVersion() {
     startXsnDaemon
   fi
 
-  walletVersion=$( ($CONFIGFOLDER/$COIN_CLIENT $WALLETINFO |grep -m1 'version'|awk '{ print $2 }') )
+  walletVersion=$( ($CONFIGFOLDER/$COIN_CLIENT $NETWORKINFO |grep -m1 'version'|awk '{ print $2 }') )
 
   if [[ $wasStarted = 1 ]]; then
     echo -e "Shutting daemon down again"
@@ -364,6 +365,40 @@ function checks() {
   fi
 }
 
+function commandList() {
+
+  if [[ -z "$(ps axo cmd:100 | egrep $COIN_DAEMON | grep ^[^grep])" ]]; then
+    echo -e "XSN Daemon is not running"
+  else
+     echo -e "1: Wallet-Information"
+     echo -e "2: Blockchain-Information"
+     echo -e "3: Network-Information"
+     echo -e "4: Synchronisation-Information"
+     echo -e "5: Back to Menu"
+
+     shouldloop=true;
+     while $shouldloop; do
+       read -rp "Please select your choice: " opt
+       case $opt in
+         "1") $CONFIGFOLDER/$COIN_CLIENT $WALLETINFO
+         ;;
+         "2") $CONFIGFOLDER/$COIN_CLIENT $BLOCKCHAININFO
+         ;;
+         "3") $CONFIGFOLDER/$COIN_CLIENT $NETWORKINFO
+         ;;
+         "4") $CONFIGFOLDER/$COIN_CLIENT $ISSYNCED
+         ;;
+         "5") shouldloop=false;
+         menu
+         break;
+         ;;
+
+         *) echo "invalid option";;
+        esac
+      done
+  fi
+}
+
 function showName() {
   echo -e "███████╗████████╗ █████╗ ██╗  ██╗███████╗███╗   ██╗███████╗████████╗"
   echo -e "██╔════╝╚══██╔══╝██╔══██╗██║ ██╔╝██╔════╝████╗  ██║██╔════╝╚══██╔══╝"
@@ -386,7 +421,8 @@ function menu() {
   echo -e "════════════════════════════"
   echo -e "1: Install full Masternode"
   echo -e "2: Update Masternode"
-  echo -e "3: Exit"
+  echo -e "3: List Commands"
+  echo -e "4: Exit"
   echo -e "════════════════════════════"
 
   #PS3="Ihre Wahl : "
@@ -398,7 +434,10 @@ function menu() {
     "2") echo -e "Update Masternode"
          doUpdateMasternode
     ;;
-    "3") echo -e "3"
+    "3") commandList
+    ;;
+
+    "4") exit
     ;;
 
     *) echo "invalid option";;
