@@ -1,5 +1,10 @@
 #!/bin/bash
 
+#Debug
+#COIN_GIT='https://github.com/X9Developers/XSN/releases/download/v1.0.13/xsn-1.0.13-linux64.tar.gz'
+#FILE_NAME_TAR='xsn-1.0.13-linux64.tar.gz'
+#FILE_NAME='xsn-1.0.13'
+
 SCRIPTVER=1.0.0
 
 COIN_NAME='XSN'
@@ -65,7 +70,9 @@ function backupData() {
   else
     echo -e "No $COIN_NAME install found"
     echo -e "Do you want a full Masternode install?"
-    menu
+
+    #TODO Verschachtelung vermeiden
+    #menu
   fi
 }
 
@@ -73,7 +80,7 @@ function checkWalletVersion() {
   walletVersion=$( ($CONFIGFOLDER/$COIN_CLIENT $WALLETINFO |grep 'walletversion'|awk '{ print $2 }') )
   if [[ ${walletVersion::-1} = $WALLET_VER ]]; then
     echo -e "You are already running the latest XSN-Core."
-    menu
+    exit
   fi
   # TODO Oder Wallet Version konnte nicht abgefragt werden
   echo -e "Starting Update"
@@ -315,7 +322,7 @@ function addBootstrap() {
     echo -e "Installing bootstrap"
     installBootstrap
   else
-    echo -e "Do nothing"
+    echo -e "Bootstrap already installed, fine"
   fi
 }
 
@@ -341,7 +348,7 @@ function showName() {
 }
 
 function menu() {
-  clear
+  #clear
   showName
   checks
 
@@ -362,7 +369,8 @@ function menu() {
     "1") echo -e "Install full Masternode"
          doFullMasternode
     ;;
-    "2") echo -e "2"
+    "2") echo -e "Update Masternode"
+         doUpdateMasternode
     ;;
     "3") echo -e "3"
     ;;
