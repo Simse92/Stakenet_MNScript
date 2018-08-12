@@ -48,13 +48,18 @@ function doFullMasternode() {
 function doUpdateMasternode {
   clear
   backupData
-  checkWalletVersion
-  stopAndDelOldDaemon
-  downloadInstallNode
-  recoverBackup
-  addBootstrap
-  startXsnDaemon
-  printInformationDuringSync
+
+  if  [[ $? -ne 42 ]]; then
+    checkWalletVersion
+    stopAndDelOldDaemon
+    downloadInstallNode
+    recoverBackup
+    addBootstrap
+    startXsnDaemon
+    printInformationDuringSync
+  else
+    menu
+  fi
 }
 
 function backupData() {
@@ -69,11 +74,11 @@ function backupData() {
     cp $( eval echo $CONFIGFOLDER/wallet.dat $COIN_BACKUP ) #2> /dev/null
 
   else
+    #Fancy blink blink
     echo -e "No $COIN_NAME install found"
     echo -e "Do you want a full Masternode install?"
-
-    #TODO Verschachtelung vermeiden
-    #menu
+    echo -e ""
+    return 42
   fi
 }
 
@@ -400,4 +405,4 @@ function menu() {
    esac
 }
 
-checkWalletVersion
+menu
