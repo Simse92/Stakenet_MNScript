@@ -32,6 +32,7 @@ WALLETINFO='getwalletinfo'
 
 #Global variables
 NODE_IP=""
+WALLET_TIMEOUT_S=45   #Test showed that the wallet is up after 40 seconds
 
 function doFullMasternode() {
   clear
@@ -246,19 +247,26 @@ EOF
 }
 
 function startXsnDaemon() {
-  echo -e "Starting $COIN_NAME daemon"
+  echo -e "Starting $COIN_NAME daemon (takes up to $WALLET_TIMEOUT_S seconds)"
   $CONFIGFOLDER/$COIN_DAEMON ##2> /dev/null
 
   #WaitOnServerStart
   waitWallet="-1"
-  while [ $waitWallet -ne "0" ]
+  retryCounter=0
+  while [[ $waitWallet -ne "0" && $retryCounter -lt $WALLET_TIMEOUT_S ]]
   do
     sleep 1
     2>/dev/null 1>/dev/null $CONFIGFOLDER/$COIN_CLIENT $BLOCKCHAININFO
     waitWallet="$?"
     echo -n "."
+    retryCounter=$[retryCounter+1]
   done
-  echo -e "Wallet up"
+
+  if [[ $retryCounter -ge $WALLET_TIMEOUT_S ]]; then
+    echo -e "Error during wallet startup"
+  else
+    echo -e "Wallet up"
+  fi
 }
 
 function waitSync() {
