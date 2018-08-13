@@ -264,6 +264,8 @@ function startXsnDaemon() {
 
   if [[ $retryCounter -ge $WALLET_TIMEOUT_S ]]; then
     echo -e "Error during wallet startup"
+    exit
+    #TODO Wrong MN key?
   else
     echo -e "Wallet up"
   fi
