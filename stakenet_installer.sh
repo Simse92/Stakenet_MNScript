@@ -29,6 +29,8 @@ ISSYNCED='mnsync status'
 BLOCKCHAININFO='getblockchaininfo'
 NETWORKINFO='getnetworkinfo'
 WALLETINFO='getwalletinfo'
+GREENTICK='\033[0;32m\xE2\x9C\x94\033[0m'
+CURSOR_PREVIOUS_LINE='\033[1A'
 
 #Global variables
 NODE_IP=""
@@ -51,7 +53,7 @@ function doUpdateMasternode {
   clear
   backupData
 
-  if  [[ $? -ne 42 ]]; then
+  if  [[ $? -ne 1 ]]; then
     checkWalletVersion
     stopAndDelOldDaemon
     downloadInstallNode
@@ -72,15 +74,15 @@ function backupData() {
       mkdir $( eval echo $COIN_BACKUP )
     fi
 
-    cp $( eval echo $CONFIGFOLDER/xsn.conf $COIN_BACKUP ) #2> /dev/null
-    cp $( eval echo $CONFIGFOLDER/wallet.dat $COIN_BACKUP ) #2> /dev/null
+    cp $( eval echo $CONFIGFOLDER/xsn.conf $COIN_BACKUP ) 2> /dev/null
+    cp $( eval echo $CONFIGFOLDER/wallet.dat $COIN_BACKUP ) 2> /dev/null
 
   else
     #Fancy blink blink
     echo -e "No $COIN_NAME install found"
     echo -e "Do you want a full Masternode install?"
     echo -e ""
-    return 42
+    return 1
   fi
 }
 
@@ -88,7 +90,7 @@ function checkWalletVersion() {
 
   wasStarted=0
   if [[ -z "$(ps axo cmd:100 | egrep $COIN_DAEMON | grep ^[^grep])" ]]; then
-    echo -e "Starting daemon to check version..."
+    echo -e "Starting daemon to check version.."
     wasStarted=1
     startXsnDaemon
   fi
@@ -142,14 +144,12 @@ function deleteOldInstallationAndBackup() {
     stopDaemon
 
     #remove old ufw port
-    ufw delete allow $COIN_PORT/tcp #>/dev/null 2>&1
+    ufw delete allow $COIN_PORT/tcp >/dev/null 2>&1
 
   fi
 
   #remove old folder
   rm -rf $CONFIGFOLDER #> /dev/null 2>&1
-
-  echo -e "Done";
 }
 
 function stopDaemon() {
@@ -191,11 +191,35 @@ function memorycheck() {
 
 function enable_firewall() {
   echo -e "Setting up firewall to allow traffic on port $COIN_PORT"
-  ufw allow ssh/tcp #>/dev/null 2>&1
-  ufw limit ssh/tcp #>/dev/null 2>&1
-  ufw allow $COIN_PORT/tcp #>/dev/null 2>&1
-  ufw logging on #>/dev/null 2>&1
-  echo "y" | ufw enable #>/dev/null 2>&1
+  ufw allow ssh/tcp >/dev/null 2>&1
+  ufw limit ssh/tcp >/dev/null 2>&1
+  ufw allow $COIN_PORT/tcp >/dev/null 2>&1
+  ufw logging on >/dev/null 2>&1
+  echo "y" | ufw enable >/dev/null 2>&1
+}
+
+#From https://stackoverflow.com/questions/4686464/how-to-show-wget-progress-bar-only
+function progressfilt ()
+{
+    local flag=false c count cr=$'\r' nl=$'\n'
+    while IFS='' read -d '' -rn 1 c
+    do
+        if $flag
+        then
+            printf '%c' "$c"
+        else
+            if [[ $c != $cr && $c != $nl ]]
+            then
+                count=0
+            else
+                ((count++))
+                if ((count > 1))
+                then
+                    flag=true
+                fi
+            fi
+        fi
+    done
 }
 
 function downloadInstallNode() {
@@ -205,10 +229,22 @@ function downloadInstallNode() {
     mkdir $( eval echo $CONFIGFOLDER )
   fi
 
-  wget $COIN_GIT #> /dev/null 2>&1
-  tar xfvz $FILE_NAME_TAR  #> /dev/null 2>&1
-  cp $FILE_NAME/bin/xsnd $CONFIGFOLDER #> /dev/null 2>&1
-  cp $FILE_NAME/bin/xsn-cli $CONFIGFOLDER #> /dev/null 2>&1
+  wget --progress=bar:force $COIN_GIT 2>&1 | progressfilt
+  if [ $? -ne 0 ]
+  then
+    echo -e "Failed to download $COIN_GIT"
+    exit
+  fi
+
+  tar xfvz $FILE_NAME_TAR  > /dev/null 2>&1
+  if [ $? -ne 0 ]
+  then
+    echo -e "Failed to unzip $FILE_NAME_TAR"
+    exit
+  fi
+
+  cp $FILE_NAME/bin/xsnd $CONFIGFOLDER > /dev/null 2>&1
+  cp $FILE_NAME/bin/xsn-cli $CONFIGFOLDER > /dev/null 2>&1
   chmod 777 $CONFIGFOLDER/xsn*
 
   #Clean up
@@ -263,53 +299,61 @@ function startXsnDaemon() {
   #WaitOnServerStart
   waitWallet="-1"
   retryCounter=0
+  echo -ne "Waiting on wallet"
   while [[ $waitWallet -ne "0" && $retryCounter -lt $WALLET_TIMEOUT_S ]]
   do
     sleep 1
     2>/dev/null 1>/dev/null $CONFIGFOLDER/$COIN_CLIENT $BLOCKCHAININFO
     waitWallet="$?"
-    echo -n "."
     retryCounter=$[retryCounter+1]
+    echo -ne "."
   done
 
+  echo ""
   if [[ $retryCounter -ge $WALLET_TIMEOUT_S ]]; then
     echo -e "Error during wallet startup"
+    printErrorLog
     exit
-    #TODO Wrong MN key?
   else
-    echo -e "Wallet up"
+    echo -e "Wallet startup successful"
   fi
-}
-
-function waitSync() {
-  syncStatus=$( ($CONFIGFOLDER/$COIN_CLIENT $ISSYNCED |grep 'IsSynced'|awk '{ print $2 }') )
 }
 
 function printInformationDuringSync() {
   syncStatus='false '
+  bcSyncStatus='false '
+  mnlSyncStatus='false '
+  wlSyncStatus='false '
   while [ ! ${syncStatus::-1} = 'true' ]
   do
     actBlock=$( ($CONFIGFOLDER/$COIN_CLIENT $BLOCKCHAININFO |grep 'blocks'|awk '{ print $2 }') )
     maxBlock=$( ($CONFIGFOLDER/$COIN_CLIENT $BLOCKCHAININFO |grep 'headers'|awk '{ print $2 }') )
     numCon=$( ($CONFIGFOLDER/$COIN_CLIENT $NETWORKINFO |grep 'connections'|awk '{ print $2 }') )
 
-    echo -e "═══════════════════════════"
-    echo -e "Synchronisation"
-    echo -n "Time: "
-    date
-    echo -e "Number of connections: ${numCon::-1}"
-    echo -e "Sync status: ${syncStatus::-1}"
-    echo -e "Block progress: ${actBlock::-1}/${maxBlock::-1}"
-    echo -e "═══════════════════════════"
+    echo -ne "═══════════════════════════
+Synchronisation Time: $(date)
 
-    sleep 5
+Number of connections: ${numCon::-1}
+Block progress: ${actBlock::-1}/${maxBlock::-1}
+
+Blockchain Sync status: ${bcSyncStatus::-1}
+Masternode Sync status: ${mnlSyncStatus::-1}
+Winners list Sync status: ${wlSyncStatus::-1}
+
+Sync status: ${syncStatus::-1}
+═══════════════════════════"\\033[11A\\r
+
+    sleep 1
     syncStatus=$( ($CONFIGFOLDER/$COIN_CLIENT $ISSYNCED |grep 'IsSynced'|awk '{ print $2 }') )
+    bcSyncStatus=$( ($CONFIGFOLDER/$COIN_CLIENT $ISSYNCED |grep 'IsBlockchainSynced'|awk '{ print $2 }') )
+    mnlSyncStatus=$( ($CONFIGFOLDER/$COIN_CLIENT $ISSYNCED |grep 'IsMasternodeListSynced'|awk '{ print $2 }') )
+    wlSyncStatus=$( ($CONFIGFOLDER/$COIN_CLIENT $ISSYNCED |grep 'IsWinnersListSynced'|awk '{ print $2 }') )
   done
-  echo -e "Sync finished!"
+  echo -e "$GREENTICK Sync finished!"
 }
 
 function printErrorLog() {
-  error=$( (cat debug.log |grep Error) )
+  error=$( (cat $CONFIGFOLDER/debug.log |grep Error) )
   echo -e "$error"
 }
 
@@ -348,7 +392,7 @@ function checkBootstrap() {
 }
 
 function installBootstrap() {
-  wget $BOOTSTRAP_LINK
+  wget --progress=bar:force $BOOTSTRAP_LINK 2>&1 | progressfilt
   if [ $? -ne 0 ]
   then
     echo -e "Failed to download $BOOTSTRAP_FILE_NAME"
