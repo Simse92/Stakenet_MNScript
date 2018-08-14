@@ -6,6 +6,7 @@
 #FILE_NAME='xsn-1.0.13'
 
 SCRIPTVER=1.0.0
+SCRIPT_NAME='stakenet_mninstaller.sh'
 
 COIN_NAME='XSN'
 CONFIG_FILE='xsn.conf'
@@ -29,24 +30,31 @@ ISSYNCED='mnsync status'
 BLOCKCHAININFO='getblockchaininfo'
 NETWORKINFO='getnetworkinfo'
 WALLETINFO='getwalletinfo'
+
+#Console commands
 GREENTICK='\033[0;32m\xE2\x9C\x94\033[0m'
 CURSOR_PREVIOUS_LINE='\033[1A'
+RED='\E[31m'
+GREEN='\E[32m'
+BLINK='\E[5m'
+OFF='\E[0m'
 
 #Global variables
 NODE_IP=""
-WALLET_TIMEOUT_S=45   #Test showed that the wallet is up after 40 seconds
+WALLET_TIMEOUT_S=60   #Test showed that the wallet is up after 60 seconds
 
 function doFullMasternode() {
   clear
-  #installDependencies
+  installDependencies
   deleteOldInstallationAndBackup
   memorycheck
   enable_firewall
   downloadInstallNode
   coreConfiguration
-  #addBootstrap
+  addBootstrap
   startXsnDaemon
   printInformationDuringSync
+  outro
 }
 
 function doUpdateMasternode {
@@ -58,9 +66,10 @@ function doUpdateMasternode {
     stopAndDelOldDaemon
     downloadInstallNode
     recoverBackup
-    #addBootstrap
+    addBootstrap
     startXsnDaemon
     printInformationDuringSync
+    outro
   else
     menu
   fi
@@ -68,7 +77,7 @@ function doUpdateMasternode {
 
 function backupData() {
   if [[ -f $( eval echo "$CONFIGFOLDER/wallet.dat" ) ]]; then
-    echo -e "Found existing xsncore, making backup"
+    echo -e "Found existing xsncore, making backup..."
 
     if [[ ! -d $( eval echo "$COIN_BACKUP" ) ]]; then
       mkdir $( eval echo $COIN_BACKUP )
@@ -77,12 +86,25 @@ function backupData() {
     cp $( eval echo $CONFIGFOLDER/xsn.conf $COIN_BACKUP ) 2> /dev/null
     cp $( eval echo $CONFIGFOLDER/wallet.dat $COIN_BACKUP ) 2> /dev/null
 
+    echo -e "$GREENTICK Backup done!"
   else
     #Fancy blink blink
-    echo -e "No $COIN_NAME install found"
-    echo -e "Do you want a full Masternode install?"
+    echo -e "${RED}ERROR:${OFF} No $COIN_NAME install found"
     echo -e ""
-    return 1
+    echo -e "Do you want a full Masternode install?"
+    echo -e "1: Yes"
+    echo -e "2: No"
+
+    read -rp "" opt
+    case $opt in
+      "1") return 1
+      ;;
+      "2") exit
+      ;;
+      *) echo -e "${RED}ERROR:${OFF} Invalid option"
+          exit
+      ;;
+     esac
   fi
 }
 
@@ -98,16 +120,16 @@ function checkWalletVersion() {
   walletVersion=$( ($CONFIGFOLDER/$COIN_CLIENT $NETWORKINFO |grep -m1 'version'|awk '{ print $2 }') )
 
   if [[ $wasStarted = 1 ]]; then
-    echo -e "Shutting daemon down again"
-    $CONFIGFOLDER/$COIN_CLIENT stop
+    echo -e "Shutting daemon down again.."
+    2>/dev/null 1>/dev/null $CONFIGFOLDER/$COIN_CLIENT stop
   fi
 
-  if [[ ${walletVersion::-1} = $WALLET_VER ]]; then
-    echo -e "You are already running the latest XSN-Core.."
+  if [[ ${walletVersion::-1} -ge $WALLET_VER ]]; then
+    echo -e "$GREENTICK You are already running the latest XSN-Core!"
     exit
   fi
 
-  echo -e "Starting Update"
+  echo -e "Starting Update.."
 }
 
 function stopAndDelOldDaemon() {
@@ -123,15 +145,17 @@ function recoverBackup() {
 }
 
 function installDependencies() {
-    echo -e "Installing Dependencies"
-    apt update #> /dev/null 2>&1
-    #apt upgrade #> /dev/null 2>&1
-    apt install -y ufw python virtualenv git unzip pv #> /dev/null 2>&1
+    echo -ne "Installing dependencies${BLINK}..${OFF}"
+    apt update > /dev/null 2>&1
+    apt upgrade > /dev/null 2>&1
+    apt install -y ufw python virtualenv git unzip pv > /dev/null 2>&1
+    echo -e \\r"Installing dependencies.."
+    echo -e "$GREENTICK Dependency install done!"
 }
 
 function deleteOldInstallationAndBackup() {
   if [[ -f $( eval echo "$CONFIGFOLDER/wallet.dat" ) ]]; then
-    echo -e "Found existing xsncore, making backup"
+    echo -e "Found existing xsncore, making backup.."
 
     if [[ ! -d $( eval echo "$COIN_BACKUP" ) ]]; then
       mkdir $( eval echo $COIN_BACKUP )
@@ -154,7 +178,7 @@ function deleteOldInstallationAndBackup() {
 
 function stopDaemon() {
   if [[ ! -z "$(ps axo cmd:100 | egrep $COIN_DAEMON | grep ^[^grep])" ]]; then
-    $CONFIGFOLDER/$COIN_CLIENT stop #2> /dev/null
+    2>/dev/null 1>/dev/null $CONFIGFOLDER/$COIN_CLIENT stop
 
     while [[ -z "$(ps axo cmd:100 | egrep $COIN_DAEMON | grep ^[^grep])" ]]
     do
@@ -165,13 +189,13 @@ function stopDaemon() {
 
 function memorycheck() {
 
-  echo -e "Checking Memory"
+  echo -e "Checking Memory.."
   FREEMEM=$( free -m |sed -n '2,2p' |awk '{ print $4 }' )
   SWAPS=$( free -m |tail -n1 |awk '{ print $2 }' )
 
   if [[ $FREEMEM -lt 2048 ]]; then
     if [[ $SWAPS -eq 0 ]]; then
-      echo -e "Adding swap"
+      echo -e "Adding swap.."
       fallocate -l 4G /swapfile
   		chmod 600 /swapfile
   		mkswap /swapfile
@@ -179,23 +203,24 @@ function memorycheck() {
   		cp /etc/fstab /etc/fstab.bak
   		echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
 
-      echo -e "Added 4G Swapfile"
+      echo -e "$GREENTICK Added 4G Swapfile!"
     else
-      echo -e "Swapsize: $SWAPS, thats enough"
+      echo -e "$GREENTICK Swapsize: $SWAPS, thats enough!"
     fi
   else
-    echo -e "Freemem: $FREEMEN, thats enough free ram"
+    echo -e "$GREENTICK Freemem: $FREEMEN, thats enough free RAM!"
   fi
 
 }
 
 function enable_firewall() {
-  echo -e "Setting up firewall to allow traffic on port $COIN_PORT"
+  echo -e "Setting up firewall to allow traffic on port $COIN_PORT.."
   ufw allow ssh/tcp >/dev/null 2>&1
   ufw limit ssh/tcp >/dev/null 2>&1
   ufw allow $COIN_PORT/tcp >/dev/null 2>&1
   ufw logging on >/dev/null 2>&1
   echo "y" | ufw enable >/dev/null 2>&1
+  echo -e "$GREENTICK Firewall setup done!"
 }
 
 #From https://stackoverflow.com/questions/4686464/how-to-show-wget-progress-bar-only
@@ -223,7 +248,8 @@ function progressfilt ()
 }
 
 function downloadInstallNode() {
-  echo -e "Downloading and Installing VPS XSN Daemon"
+  echo -e "Downloading and installing VPS XSN daemon.."
+  rm -rf $FILE_NAME_TAR*
 
   if [[ ! -d $( eval echo "$CONFIGFOLDER" ) ]]; then
     mkdir $( eval echo $CONFIGFOLDER )
@@ -232,14 +258,14 @@ function downloadInstallNode() {
   wget --progress=bar:force $COIN_GIT 2>&1 | progressfilt
   if [ $? -ne 0 ]
   then
-    echo -e "Failed to download $COIN_GIT"
+    echo -e "${RED}ERROR:${OFF} Failed to download $COIN_GIT!"
     exit
   fi
 
-  tar xfvz $FILE_NAME_TAR  > /dev/null 2>&1
+  tar xfvz $FILE_NAME_TAR*  > /dev/null 2>&1
   if [ $? -ne 0 ]
   then
-    echo -e "Failed to unzip $FILE_NAME_TAR"
+    echo -e "${RED}ERROR:${OFF} Failed to unzip $FILE_NAME_TAR!"
     exit
   fi
 
@@ -249,10 +275,12 @@ function downloadInstallNode() {
 
   #Clean up
   rm -rf $FILE_NAME*
+
+  echo -e "$GREENTICK VPS XSN daemon installation done!"
 }
 
 function coreConfiguration() {
-  echo -e "Generating $COIN_NAME Config"
+  echo -e "Generating $COIN_NAME config.."
 
   RPCUSER=$(openssl rand -hex 11)
   RPCPASSWORD=$(openssl rand -hex 20)
@@ -268,7 +296,7 @@ function coreConfiguration() {
   #echo -e "Enter your external VPS IPv4 adress"
   #read -rp "Use the following scheme XXX.XXX.XXX.XXX: " VPSIP
   getIP
-  echo -e "Using IP Address $NODE_IP"
+  echo -e "Using IP Address $NODE_IP.."
 
 cat << EOF > $(eval echo $CONFIGFOLDER/$CONFIG_FILE)
 
@@ -289,33 +317,32 @@ cat << EOF > $(eval echo $CONFIGFOLDER/$CONFIG_FILE)
 
 EOF
 
-  echo -e "Finished $CONFIG_FILE configuration"
+  echo -e "$GREENTICK Finished $CONFIG_FILE configuration!"
 }
 
 function startXsnDaemon() {
-  echo -e "Starting $COIN_NAME daemon (takes up to $WALLET_TIMEOUT_S seconds)"
-  $CONFIGFOLDER/$COIN_DAEMON ##2> /dev/null
+  echo -e "Starting $COIN_NAME daemon (takes up to $WALLET_TIMEOUT_S seconds).."
+  2>/dev/null 1>/dev/null $CONFIGFOLDER/$COIN_DAEMON
 
   #WaitOnServerStart
   waitWallet="-1"
   retryCounter=0
-  echo -ne "Waiting on wallet"
+  echo -ne "Waiting on wallet${BLINK}..${OFF}"
   while [[ $waitWallet -ne "0" && $retryCounter -lt $WALLET_TIMEOUT_S ]]
   do
     sleep 1
     2>/dev/null 1>/dev/null $CONFIGFOLDER/$COIN_CLIENT $BLOCKCHAININFO
     waitWallet="$?"
     retryCounter=$[retryCounter+1]
-    echo -ne "."
   done
 
-  echo ""
+  echo -e \\r"Waiting on wallet.."
   if [[ $retryCounter -ge $WALLET_TIMEOUT_S ]]; then
-    echo -e "Error during wallet startup"
+    echo -e "${RED}ERROR:${OFF}"
     printErrorLog
     exit
   else
-    echo -e "Wallet startup successful"
+    echo -e "$GREENTICK Wallet startup successful!"
   fi
 }
 
@@ -349,7 +376,7 @@ Sync status: ${syncStatus::-1}
     mnlSyncStatus=$( ($CONFIGFOLDER/$COIN_CLIENT $ISSYNCED |grep 'IsMasternodeListSynced'|awk '{ print $2 }') )
     wlSyncStatus=$( ($CONFIGFOLDER/$COIN_CLIENT $ISSYNCED |grep 'IsWinnersListSynced'|awk '{ print $2 }') )
   done
-  echo -e "$GREENTICK Sync finished!"
+  echo -e "$GREENTICK Synchronisation finished!"
 }
 
 function printErrorLog() {
@@ -362,20 +389,20 @@ function getIP() {
   foundAddr=$( eval ifconfig | grep -Eo 'inet (addr:)?([0-9]*\.){3}[0-9]*' | grep -Eo '([0-9]*\.){3}[0-9]*' | grep -v '127.0.0.1')
 
   if [[ "$foundAddr" = *$'\n'* ]]; then
-    echo -e "More than one IP address found"
+    echo -e "More than one IP address found.."
     echo -e "Select the one you want to use"
 
     select option in $foundAddr
     do
        case "$option" in
           End)  echo "End"; break ;;
-            "")  echo "Invalid selection" ;;
+            "")  echo -e "${RED}ERROR:${OFF} Invalid selection" ;;
              *)  NODE_IP="$option"
                  break
        esac
     done
   else
-      echo "Found IP Address $foundAddr"
+      echo -e "Found IP Address $foundAddr.."
       NODE_IP="$foundAddr"
   fi
 }
@@ -383,31 +410,32 @@ function getIP() {
 function checkBootstrap() {
   if [ -f $CONFIGFOLDER/$BOOTSTRAP_FILE_NAME* ]
   then
-    echo -e "Bootstrap already installed"
+    echo -e "Bootstrap already installed.."
     return 0
   else
-    echo -e "Bootstrap not found"
+    echo -e "Bootstrap not found.."
     return 1
   fi
 }
 
 function installBootstrap() {
+  rm -rf $BOOTSTRAP_ZIP_NAME*
   wget --progress=bar:force $BOOTSTRAP_LINK 2>&1 | progressfilt
   if [ $? -ne 0 ]
   then
-    echo -e "Failed to download $BOOTSTRAP_FILE_NAME"
+    echo -e "${RED}ERROR:${OFF} Failed to download $BOOTSTRAP_FILE_NAME"
   else
     unzip -j $BOOTSTRAP_ZIP_NAME* $BOOTSTRAP_FILE_NAME -d $CONFIGFOLDER
     if [ $? -ne 0 ]
     then
-      echo -e "Failed to unzip $BOOTSTRAP_ZIP_NAME"
+      echo -e "${RED}ERROR:${OFF} Failed to unzip $BOOTSTRAP_ZIP_NAME"
     else
       rm -rf $BOOTSTRAP_ZIP_NAME*
       rm -rf $CONFIGFOLDER/blocks
       rm -rf $CONFIGFOLDER/chainstate
       rm -rf $CONFIGFOLDER/peers.dat
 
-      echo -e "Successfully installed bootstrap"
+      echo -e "$GREENTICK Successfully installed bootstrap!"
     fi
   fi
 }
@@ -417,19 +445,19 @@ function addBootstrap() {
   bootstrapCheck=$?
   if [[ $bootstrapCheck != 0 ]]
   then
-    echo -e "Installing bootstrap"
+    echo -e "Installing bootstrap.."
     installBootstrap
   fi
 }
 
 function checks() {
   if [[ $( lsb_release -d ) != *16.04* ]]; then
-    echo -e "You are not running Ubuntu 16.04. Installation is cancelled."
+    echo -e "${RED}ERROR:${OFF} You are not running Ubuntu 16.04. Installation is cancelled."
     exit 1
   fi
 
   if [[ $EUID -ne 0 ]]; then
-     echo -e "Must be run as root"
+     echo -e "${RED}ERROR:${OFF} Must be run as root (try \"sudo $SCRIPT_NAME\" )"
      exit 1
   fi
 }
@@ -437,7 +465,7 @@ function checks() {
 function commandList() {
 
   if [[ -z "$(ps axo cmd:100 | egrep $COIN_DAEMON | grep ^[^grep])" ]]; then
-    echo -e "XSN Daemon is not running"
+    echo -e "${RED}ERROR:${OFF} XSN Daemon is not running"
   else
      shouldloop=true;
      while $shouldloop; do
@@ -453,23 +481,43 @@ function commandList() {
        echo -e "════════════════════════════"
 
        case $opt in
-         "1") $CONFIGFOLDER/$COIN_CLIENT $WALLETINFO
+         "1") echo -e "${GREEN}$($CONFIGFOLDER/$COIN_CLIENT $WALLETINFO)${OFF}"
          ;;
-         "2") $CONFIGFOLDER/$COIN_CLIENT $BLOCKCHAININFO
+         "2") echo -e "${GREEN}$($CONFIGFOLDER/$COIN_CLIENT $BLOCKCHAININFO)${OFF}"
          ;;
-         "3") $CONFIGFOLDER/$COIN_CLIENT $NETWORKINFO
+         "3") echo -e "${GREEN}$($CONFIGFOLDER/$COIN_CLIENT $NETWORKINFO)${OFF}"
          ;;
-         "4") $CONFIGFOLDER/$COIN_CLIENT $ISSYNCED
+         "4") echo -e "${GREEN}$($CONFIGFOLDER/$COIN_CLIENT $ISSYNCED)${OFF}"
          ;;
          "5") shouldloop=false;
          menu
          break;
          ;;
 
-         *) echo "invalid option";;
+         *) echo -e "${RED}ERROR:${OFF} Invalid option";;
         esac
       done
   fi
+}
+
+function outro() {
+  clear
+  showName
+  echo -e "${GREENTICK} Setup finished. Now you can start your masternode from your local wallet!"
+  echo -e ""
+  echo -e ""
+  creatorName
+  echo -e "Dontaions always accepted gracefully to:"
+  echo -e "XSN: XjS84bRgYd83hikHjhnQWQJJGDueFQEM1m"
+  echo -e "BTC: 16azsAD43MWoBDkfRvdKt6GprdjYSrw2bL"
+}
+
+function creatorName() {
+  echo -e "      ·▄▄▄▄  ▄▄▄ . ▐ ▄        ▐ ▄ "
+  echo -e "      ██▪ ██ ▀▄.▀·•█▌▐█▪     •█▌▐█"
+  echo -e "      ▐█· ▐█▌▐▀▀▪▄▐█▐▐▌ ▄█▀▄ ▐█▐▐▌"
+  echo -e "      ██. ██ ▐█▄▄▌██▐█▌▐█▌.▐▌██▐█▌"
+  echo -e "      ▀▀▀▀▀•  ▀▀▀ ▀▀ █▪ ▀█▄▀▪▀▀ █▪"
 }
 
 function showName() {
@@ -482,11 +530,11 @@ function showName() {
 }
 
 function menu() {
-  #clear
+  clear
   showName
   checks
 
-  echo -e "Masternode script $SCRIPTVER"
+  echo -e "Masternode script $SCRIPTVER (from Denon)"
   echo -e "════════════════════════════"
   echo -e "══════════ Menu ════════════"
   echo -e "════════════════════════════"
@@ -501,10 +549,10 @@ function menu() {
   #PS3="Ihre Wahl : "
   read -rp "Please select your choice: " opt
   case $opt in
-    "1") echo -e "Install full Masternode"
+    "1") echo -e "Install full Masternode.."
          doFullMasternode
     ;;
-    "2") echo -e "Update Masternode"
+    "2") echo -e "Update Masternode.."
          doUpdateMasternode
     ;;
     "3") commandList
@@ -513,7 +561,7 @@ function menu() {
     "4") exit
     ;;
 
-    *) echo "invalid option";;
+    *) echo -e "${RED}ERROR:${OFF} Invalid option";;
    esac
 }
 
