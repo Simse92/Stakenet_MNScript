@@ -110,8 +110,7 @@ function checkWalletVersion() {
 
 function stopAndDelOldDaemon() {
   #stop xsn-daemon
-  #TODO Check ob der Prozess überhaut läuft
-  $CONFIGFOLDER/$COIN_CLIENT stop #2> /dev/null
+  stopDaemon
   rm -rf $CONFIGFOLDER/$COIN_CLIENT #> /dev/null 2>&1
   rm -rf $CONFIGFOLDER/$COIN_DAEMON #> /dev/null 2>&1
 }
@@ -140,7 +139,7 @@ function deleteOldInstallationAndBackup() {
     cp $( eval echo $CONFIGFOLDER/wallet.dat $COIN_BACKUP ) #2> /dev/null
 
     #stop xsn-daemon
-    $CONFIGFOLDER/$COIN_CLIENT stop #2> /dev/null
+    stopDaemon
 
     #remove old ufw port
     ufw delete allow $COIN_PORT/tcp #>/dev/null 2>&1
@@ -151,6 +150,17 @@ function deleteOldInstallationAndBackup() {
   rm -rf $CONFIGFOLDER #> /dev/null 2>&1
 
   echo -e "Done";
+}
+
+function stopDaemon() {
+  if [[ ! -z "$(ps axo cmd:100 | egrep $COIN_DAEMON | grep ^[^grep])" ]]; then
+    $CONFIGFOLDER/$COIN_CLIENT stop #2> /dev/null
+
+    while [[ -z "$(ps axo cmd:100 | egrep $COIN_DAEMON | grep ^[^grep])" ]]
+    do
+      sleep 1
+    done
+  fi
 }
 
 function memorycheck() {
