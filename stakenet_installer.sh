@@ -281,7 +281,7 @@ function printInformationDuringSync() {
   do
     actBlock=$( ($CONFIGFOLDER/$COIN_CLIENT $BLOCKCHAININFO |grep 'blocks'|awk '{ print $2 }') )
     maxBlock=$( ($CONFIGFOLDER/$COIN_CLIENT $BLOCKCHAININFO |grep 'headers'|awk '{ print $2 }') )
-    numCon=$( ($CONFIGFOLDER/$COIN_CLIENT $WALLETINFO |grep 'connections'|awk '{ print $2 }') )
+    numCon=$( ($CONFIGFOLDER/$COIN_CLIENT $NETWORKINFO |grep 'connections'|awk '{ print $2 }') )
 
     echo -e "═══════════════════════════"
     echo -e "Synchronisation"
