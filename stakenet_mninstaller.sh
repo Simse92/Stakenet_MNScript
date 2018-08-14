@@ -88,7 +88,6 @@ function backupData() {
 
     echo -e "$GREENTICK Backup done!"
   else
-    #Fancy blink blink
     echo -e "${RED}ERROR:${OFF} No $COIN_NAME install found"
     echo -e ""
     echo -e "Do you want a full Masternode install?"
@@ -566,6 +565,3 @@ function menu() {
 }
 
 menu
-
-#coldlook=$(cat ~/.aegeus/debug.log |grep cold)
-#last20=$(tail ~/.aegeus/debug.log -n20)
