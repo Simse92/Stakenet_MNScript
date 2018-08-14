@@ -298,6 +298,11 @@ function printInformationDuringSync() {
   echo -e "Sync finished!"
 }
 
+function printErrorLog() {
+  error=$( (cat debug.log |grep Error) )
+  echo -e "$error"
+}
+
 
 function getIP() {
   foundAddr=$( eval ifconfig | grep -Eo 'inet (addr:)?([0-9]*\.){3}[0-9]*' | grep -Eo '([0-9]*\.){3}[0-9]*' | grep -v '127.0.0.1')
@@ -380,15 +385,19 @@ function commandList() {
   if [[ -z "$(ps axo cmd:100 | egrep $COIN_DAEMON | grep ^[^grep])" ]]; then
     echo -e "XSN Daemon is not running"
   else
-     echo -e "1: Wallet-Information"
-     echo -e "2: Blockchain-Information"
-     echo -e "3: Network-Information"
-     echo -e "4: Synchronisation-Information"
-     echo -e "5: Back to Menu"
-
      shouldloop=true;
      while $shouldloop; do
+
+       echo -e "1: Wallet-Information"
+       echo -e "2: Blockchain-Information"
+       echo -e "3: Network-Information"
+       echo -e "4: Synchronisation-Information"
+       echo -e "5: Back to Menu"
+
+       echo -e "════════════════════════════"
        read -rp "Please select your choice: " opt
+       echo -e "════════════════════════════"
+
        case $opt in
          "1") $CONFIGFOLDER/$COIN_CLIENT $WALLETINFO
          ;;
@@ -455,3 +464,6 @@ function menu() {
 }
 
 menu
+
+#coldlook=$(cat ~/.aegeus/debug.log |grep cold)
+#last20=$(tail ~/.aegeus/debug.log -n20)
