@@ -506,7 +506,7 @@ function outro() {
   echo -e ""
   echo -e ""
   creatorName
-  echo -e "Dontaions always accepted gracefully to:"
+  echo -e "Donations always accepted gracefully to:"
   echo -e "XSN: XjS84bRgYd83hikHjhnQWQJJGDueFQEM1m"
   echo -e "BTC: 16azsAD43MWoBDkfRvdKt6GprdjYSrw2bL"
 }
