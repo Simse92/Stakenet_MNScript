@@ -145,9 +145,9 @@ function recoverBackup() {
 
 function installDependencies() {
     echo -ne "Installing dependencies${BLINK}..${OFF}"
-    apt update > /dev/null 2>&1
-    apt upgrade > /dev/null 2>&1
-    apt install -y ufw python virtualenv git unzip pv > /dev/null 2>&1
+    echo "y" | apt update > /dev/null 2>&1
+    echo "y" | apt upgrade > /dev/null 2>&1
+    echo "y" | apt install -y ufw python virtualenv git unzip pv > /dev/null 2>&1
     echo -e \\r"Installing dependencies.."
     echo -e "$GREENTICK Dependency install done!"
 }
