@@ -5,7 +5,8 @@
 #FILE_NAME_TAR='xsn-1.0.13-linux64.tar.gz'
 #FILE_NAME='xsn-1.0.13'
 
-SCRIPTVER=1.0.0
+#Update Wallet version
+SCRIPTVER=1.0.1
 SCRIPT_NAME='stakenet_mninstaller.sh'
 
 COIN_NAME='XSN'
@@ -16,10 +17,10 @@ COIN_CLIENT='xsn-cli'
 COIN_DAEMON='xsnd'
 COIN_PORT=62583
 #Updateable
-COIN_GIT='https://github.com/X9Developers/XSN/releases/download/v1.0.14/xsn-1.0.14-linux64.tar.gz'
-FILE_NAME_TAR='xsn-1.0.14-linux64.tar.gz'
-FILE_NAME='xsn-1.0.14'
-WALLET_VER='1001400'
+COIN_GIT='https://github.com/X9Developers/XSN/releases/download/v1.0.15/xsn-1.0.15-x86_64-linux-gnu.tar.gz'
+FILE_NAME_TAR='xsn-1.0.15-x86_64-linux-gnu.tar.gz'
+FILE_NAME='xsn-1.0.15'
+WALLET_VER='1001500'
 
 BOOTSTRAP_LINK='https://github.com/X9Developers/XSN/releases/download/v1.0.13/bootstrap.dat.zip'
 BOOTSTRAP_ZIP_NAME='bootstrap.dat.zip'
@@ -30,6 +31,7 @@ ISSYNCED='mnsync status'
 BLOCKCHAININFO='getblockchaininfo'
 NETWORKINFO='getnetworkinfo'
 WALLETINFO='getwalletinfo'
+MNSTATUS='masternode status'
 
 #Console commands
 GREENTICK='\033[0;32m\xE2\x9C\x94\033[0m'
@@ -473,7 +475,8 @@ function commandList() {
        echo -e "2: Blockchain-Information"
        echo -e "3: Network-Information"
        echo -e "4: Synchronisation-Information"
-       echo -e "5: Back to Menu"
+       echo -e "5: Masternode-Status"
+       echo -e "6: Back to Menu"
 
        echo -e "════════════════════════════"
        read -rp "Please select your choice: " opt
@@ -488,7 +491,9 @@ function commandList() {
          ;;
          "4") echo -e "${GREEN}$($CONFIGFOLDER/$COIN_CLIENT $ISSYNCED)${OFF}"
          ;;
-         "5") shouldloop=false;
+         "5") echo -e "${GREEN}$($CONFIGFOLDER/$COIN_CLIENT $MNSTATUS)${OFF}"
+         ;;
+         "6") shouldloop=false;
          menu
          break;
          ;;
