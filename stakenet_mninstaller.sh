@@ -17,8 +17,8 @@ COIN_CLIENT='xsn-cli'
 COIN_DAEMON='xsnd'
 COIN_PORT=62583
 #Updateable
-COIN_GIT='https://github.com/X9Developers/XSN/releases/download/v1.0.15/xsn-1.0.15-x86_64-linux-gnu.tar.gz'
-FILE_NAME_TAR='xsn-1.0.15-x86_64-linux-gnu.tar.gz'
+COIN_GIT='https://github.com/X9Developers/XSN/releases/download/v1.0.15/xsn-1.0.15-linux64.tar.gz'
+FILE_NAME_TAR='xsn-1.0.15-linux64.tar.gz'
 FILE_NAME='xsn-1.0.15'
 WALLET_VER='1001500'
 
