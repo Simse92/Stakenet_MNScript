@@ -21,7 +21,9 @@ XSN_CONFIG_FILE='xsn.conf'
 XSN_RPC_USER=''
 XSN_RPC_PASS=''
 
+LNDGIT='https://github.com/X9Developers/swap-resolver/releases/download/v1.0.0'
 LNDPATH='$HOME/lndbin'
+
 
 RESOLVERPATH="$GOPATH/src/github.com/ExchangeUnion/swap-resolver"
 
@@ -39,9 +41,9 @@ function doFullSetup() {
 
 function installANDconfigureLNDDeamons() {
   mkdir $LNDPATH
-  wget https://github.com/X9Developers/swap-resolver/releases/download/v1.0.0/lncli -P $LNDPATH
-  wget https://github.com/X9Developers/swap-resolver/releases/download/v1.0.0/lnd -P $LNDPATH
-  wget https://github.com/X9Developers/swap-resolver/releases/download/v1.0.0/lnd_xsn -P $LNDPATH
+  wget $LNDGIT/lncli -P $LNDPATH
+  wget $LNDGIT/lnd -P $LNDPATH
+  wget $LNDGIT/lnd_xsn -P $LNDPATH
 
   chmod 777 $LNDPATH/ln*
 
