@@ -1,8 +1,12 @@
 #!/bin/bash
 SCRIPTVER=1.0.1
 
+WALLET_TIMEOUT_S=60
+NETWORK=""
+
 #Litecoin
 LTC_CODE_NAME='LTC'
+LTC_DAEMON='litecoind'
 LTC_COIN_GIT='https://download.litecoin.org/litecoin-0.16.3/linux/litecoin-0.16.3-x86_64-linux-gnu.tar.gz'
 LTC_FILE_NAME_TAR='litecoin-0.16.3-x86_64-linux-gnu.tar.gz'
 LTC_FILE_NAME='litecoin-0.16.3'
@@ -13,6 +17,7 @@ LTC_RPC_PASS=''
 
 #Stakenet
 XSN_CODE_NAME='XSN'
+XSN_DAEMON='xsnd'
 XSN_COIN_GIT='https://github.com/X9Developers/lnd/raw/master/wallets/xsn-1.0.16-x86_64-linux-gnu.tar.gz'
 XSN_FILE_NAME_TAR='xsn-1.0.16-x86_64-linux-gnu.tar.gz'
 XSN_FILE_NAME='xsn-1.0.16'
@@ -29,14 +34,30 @@ RESOLVERPATH="$GOPATH/src/github.com/ExchangeUnion/swap-resolver"
 
 function doFullSetup() {
   clear
+  networkRequest
   installDependencies
   configureGOPath
+
   installLitecoin
   createLitecoinConfig
+  startLitecoinDaemon
+
   installXsn
   createXsnConfig
+  startStakenetDaemon
 
+  installANDconfigureLNDDeamons
+  installANDconfigureSwapResolver
+}
 
+function startStakenetDaemon() {
+  echo -e "Starting $XSN_CODE_NAME daemon (takes up to $WALLET_TIMEOUT_S seconds).."
+  2>/dev/null 1>/dev/null $XSN_CONFIGFOLDER/$XSN_DAEMON
+}
+
+function startLitecoinDaemon() {
+  echo -e "Starting $LTC_CODE_NAME daemon (takes up to $WALLET_TIMEOUT_S seconds).."
+  2>/dev/null 1>/dev/null $LTC_CONFIGFOLDER/$LTC_DAEMON
 }
 
 function installANDconfigureLNDDeamons() {
@@ -48,10 +69,10 @@ function installANDconfigureLNDDeamons() {
   chmod 777 $LNDPATH/ln*
 
   # Adding lncli aliases
-  echo -n "alias xa-lnd-xsn='$LNDPATH/lncli --network testnet --rpcserver=localhost:10003 --no-macaroons' " >> ~/.profile
-  echo -n "alias xa-lnd-ltc='$LNDPATH/lncli --network testnet --rpcserver=localhost:10001 --no-macaroons' " >> ~/.profile
-  echo -n "alias xb-lnd-xsn='$LNDPATH/lncli --network testnet --rpcserver=localhost:20003 --no-macaroons' " >> ~/.profile
-  echo -n "alias xb-lnd-ltc='$LNDPATH/lncli --network testnet --rpcserver=localhost:20001 --no-macaroons' " >> ~/.profile
+  echo -n "alias xa-lnd-xsn='$LNDPATH/lncli --network $NETWORK --rpcserver=localhost:10003 --no-macaroons' " >> ~/.profile
+  echo -n "alias xa-lnd-ltc='$LNDPATH/lncli --network $NETWORK --rpcserver=localhost:10001 --no-macaroons' " >> ~/.profile
+  echo -n "alias xb-lnd-xsn='$LNDPATH/lncli --network $NETWORK --rpcserver=localhost:20003 --no-macaroons' " >> ~/.profile
+  echo -n "alias xb-lnd-ltc='$LNDPATH/lncli --network $NETWORK --rpcserver=localhost:20001 --no-macaroons' " >> ~/.profile
   source ~/.profile
 }
 
@@ -66,12 +87,28 @@ function installANDconfigureSwapResolver() {
   sed -i "s|user=xu|user=$XSN_RPC_USER|g" $RESOLVERPATH/exchange-b/lnd/ltc/start.bash
   sed -i "s|pass=xu|user=$XSN_RPC_PASS|g" $RESOLVERPATH/exchange-b/lnd/ltc/start.bash
 
+  ## Set network LTC
+  sed -i "s|testnet|user=$NETWORK|g" $RESOLVERPATH/exchange-a/lnd/ltc/start.bash
+  sed -i "s|testnet|user=$NETWORK|g" $RESOLVERPATH/exchange-b/lnd/ltc/start.bash
+
+  ### Set daemon LTC
+  sed -i "s|lnd|user=$LNDPATH/lnd|g" $RESOLVERPATH/exchange-a/lnd/ltc/start.bash
+  sed -i "s|lnd|user=$LNDPATH/lnd|g" $RESOLVERPATH/exchange-b/lnd/ltc/start.bash
+
   # Set rpcUserPass XSN
   sed -i "s|user=xu|user=$XSN_RPC_USER|g" $RESOLVERPATH/exchange-a/lnd/xsn/start.bash
   sed -i "s|pass=xu|user=$XSN_RPC_PASS|g" $RESOLVERPATH/exchange-a/lnd/xsn/start.bash
 
   sed -i "s|user=xu|user=$XSN_RPC_USER|g" $RESOLVERPATH/exchange-b/lnd/xsn/start.bash
   sed -i "s|pass=xu|user=$XSN_RPC_PASS|g" $RESOLVERPATH/exchange-b/lnd/xsn/start.bash
+
+  ## Set network XSN
+  sed -i "s|testnet|user=$NETWORK|g" $RESOLVERPATH/exchange-a/lnd/xsn/start.bash
+  sed -i "s|testnet|user=$NETWORK|g" $RESOLVERPATH/exchange-b/lnd/xsn/start.bash
+
+  ### Set daemon XSN
+  sed -i "s|lnd|user=$LNDPATH/lnd_xsn|g" $RESOLVERPATH/exchange-a/lnd/xsn/start.bash
+  sed -i "s|lnd|user=$LNDPATH/lnd_xsn|g" $RESOLVERPATH/exchange-b/lnd/xsn/start.bash
 }
 
 
@@ -201,6 +238,25 @@ function installDependencies() {
     echo "y" | apt install -y ufw python virtualenv git unzip pv golang-go > /dev/null 2>&1
     echo -e \\r"Installing dependencies.."
     echo -e "$GREENTICK Dependency install done!"
+}
+
+function networkRequest() {
+  echo -e "Which network should be used?"
+  echo -e "1: Mainnet"
+  echo -e "2: Testnet"
+
+  read -rp "" opt
+  case $opt in
+    "1") echo -e "Mainnet Let's do it"
+         NETWORK='mainnet'
+    ;;
+    "2") echo -e "Testnet Let's do it"
+         NETWORK='testnet'
+    ;;
+    *) echo -e "${RED}ERROR:${OFF} Invalid option"
+        exit
+    ;;
+   esac
 }
 
 #From https://stackoverflow.com/questions/4686464/how-to-show-wget-progress-bar-only
