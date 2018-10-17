@@ -13,9 +13,9 @@ LTC_RPC_PASS=''
 
 #Stakenet
 XSN_CODE_NAME='XSN'
-XSN_COIN_GIT='TODO'
-XSN_FILE_NAME_TAR='TODO'
-XSN_FILE_NAME='TODO'
+XSN_COIN_GIT='https://github.com/X9Developers/lnd/raw/master/wallets/xsn-1.0.16-x86_64-linux-gnu.tar.gz'
+XSN_FILE_NAME_TAR='xsn-1.0.16-x86_64-linux-gnu.tar.gz'
+XSN_FILE_NAME='xsn-1.0.16'
 XSN_CONFIGFOLDER="$HOME/.xsncore"
 XSN_CONFIG_FILE='xsn.conf'
 XSN_RPC_USER=''
