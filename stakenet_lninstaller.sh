@@ -35,8 +35,8 @@ XSN_ZMQ_TX_PORT='28445'
 
 
 LNDGIT='https://github.com/X9Developers/swap-resolver/releases/download/v1.0.0'
-LNDPATH='$HOME/lndbin'
-
+LNDPATH="$HOME/lnd"
+GOPATH="$HOME/go"
 RESOLVERPATH="$GOPATH/src/github.com/ExchangeUnion/swap-resolver"
 
 RETURN_VAR=""
@@ -189,10 +189,10 @@ function installANDconfigureLNDDeamons() {
   chmod 777 $LNDPATH/ln*
 
   # Adding lncli aliases
-  echo -n "alias xa-lnd-xsn='$LNDPATH/lncli --network $NETWORK --rpcserver=localhost:10003 --no-macaroons' " >> ~/.profile
-  echo -n "alias xa-lnd-ltc='$LNDPATH/lncli --network $NETWORK --rpcserver=localhost:10001 --no-macaroons' " >> ~/.profile
-  echo -n "alias xb-lnd-xsn='$LNDPATH/lncli --network $NETWORK --rpcserver=localhost:20003 --no-macaroons' " >> ~/.profile
-  echo -n "alias xb-lnd-ltc='$LNDPATH/lncli --network $NETWORK --rpcserver=localhost:20001 --no-macaroons' " >> ~/.profile
+  echo -e "alias xa-lnd-xsn='$LNDPATH/lncli --network $NETWORK --rpcserver=localhost:10003 --no-macaroons' " >> ~/.profile
+  echo -e "alias xa-lnd-ltc='$LNDPATH/lncli --network $NETWORK --rpcserver=localhost:10001 --no-macaroons' " >> ~/.profile
+  echo -e "alias xb-lnd-xsn='$LNDPATH/lncli --network $NETWORK --rpcserver=localhost:20003 --no-macaroons' " >> ~/.profile
+  echo -e "alias xb-lnd-ltc='$LNDPATH/lncli --network $NETWORK --rpcserver=localhost:20001 --no-macaroons' " >> ~/.profile
   source ~/.profile
 }
 
@@ -201,11 +201,11 @@ function installANDconfigureSwapResolver() {
   git clone https://github.com/X9Developers/swap-resolver.git $GOPATH/src/github.com/ExchangeUnion/swap-resolver
 
   # Set rpcUserPass LTC
-  sed -i "s|user=xu|user=$XSN_RPC_USER|g" $RESOLVERPATH/exchange-a/lnd/ltc/start.bash
-  sed -i "s|pass=xu|pass=$XSN_RPC_PASS|g" $RESOLVERPATH/exchange-a/lnd/ltc/start.bash
+  sed -i "s|user=xu|user=$LTC_RPC_USER|g" $RESOLVERPATH/exchange-a/lnd/ltc/start.bash
+  sed -i "s|pass=xu|pass=$LTC_RPC_PASS|g" $RESOLVERPATH/exchange-a/lnd/ltc/start.bash
 
-  sed -i "s|user=xu|user=$XSN_RPC_USER|g" $RESOLVERPATH/exchange-b/lnd/ltc/start.bash
-  sed -i "s|pass=xu|pass=$XSN_RPC_PASS|g" $RESOLVERPATH/exchange-b/lnd/ltc/start.bash
+  sed -i "s|user=xu|user=$LTC_RPC_USER|g" $RESOLVERPATH/exchange-b/lnd/ltc/start.bash
+  sed -i "s|pass=xu|pass=$LTC_RPC_PASS|g" $RESOLVERPATH/exchange-b/lnd/ltc/start.bash
 
   ## Set network LTC
   sed -i "s|testnet|$NETWORK|g" $RESOLVERPATH/exchange-a/lnd/ltc/start.bash
@@ -233,8 +233,8 @@ function installANDconfigureSwapResolver() {
 
 # ToDo Was machen wenn es schon drin ist?
 function configureGOPath() {
-    echo -n "export GOPATH=$HOME/go" >> ~/.bashrc
-    echo -n "export PATH=/usr/local/go/bin:$GOPATH/bin:$PATH" >> ~/.bashrc
+    echo -e "export GOPATH=$HOME/go" >> ~/.bashrc
+    echo -e "export PATH=/usr/bin/go/bin:$GOPATH/bin:$PATH" >> ~/.bashrc
     source ~/.bashrc
 }
 
@@ -318,16 +318,19 @@ function checkSyncStatusLNWallets()  {
 
   while [[ ${xa_xsn::-1} == "false" ]] || [[ ${xb_xsn::-1} == "false" ]] || [[ ${xa_ltc::-1} == "false" ]] || [[ ${xb_ltc::-1} == "false" ]]
   do
-      echo "Waiting for XSN sync (${xsn_numCon::-1} Connections): ${xsn_actBlock::-1} / ${xsn_maxBlock::-1} .."
-      echo "Waiting for LTC sync (${ltc_numCon::-1} Connections): ${ltc_actBlock::-1} / ${ltc_maxBlock::-1} .."
 
-      actBlock=$( ($XSN_CONFIGFOLDER/$XSN_CLIENT $BLOCKCHAININFO |grep 'blocks'|awk '{ print $2 }') )
-      maxBlock=$( ($XSN_CONFIGFOLDER/$XSN_CLIENT $BLOCKCHAININFO |grep 'headers'|awk '{ print $2 }') )
-      numCon=$( ($XSN_CONFIGFOLDER/$XSN_CLIENT $NETWORKINFO |grep 'connections'|awk '{ print $2 }') )
+      echo -ne "═══════════════════════════
+Synchronisation Time: $(date)
+Waiting for XSN-Lightning Exchange A: Synced to chain: ${xa_xsn::-1}
+Waiting for LTC-Lightning Exchange A: Synced to chain: ${xa_ltc::-1}
+Waiting for XSN-Lightning Exchange B: Synced to chain: ${xb_xsn::-1}
+Waiting for LTC-Lightning Exchange B: Synced to chain: ${xb_ltc::-1}
+═══════════════════════════"\\033[6A\\r
 
-      ltc_actBlock=$( ($LTC_CONFIGFOLDER/$LTC_CLIENT $BLOCKCHAININFO |grep 'blocks'|awk '{ print $2 }') )
-      ltc_maxBlock=$( ($LTC_CONFIGFOLDER/$LTC_CLIENT $BLOCKCHAININFO |grep 'headers'|awk '{ print $2 }') )
-      ltc_numCon=$( ($LTC_CONFIGFOLDER/$LTC_CLIENT $NETWORKINFO |grep 'connections'|awk '{ print $2 }') )
+      xa_xsn=$( (xa-lnd-xsn $SYNCINFO |grep 'synced_to_chain'|awk '{ print $2 }') )
+      xb_xsn=$( (xb-lnd-xsn $SYNCINFO |grep 'synced_to_chain'|awk '{ print $2 }') )
+      xa_ltc=$( (xa-lnd-ltc $SYNCINFO |grep 'synced_to_chain'|awk '{ print $2 }') )
+      xb_ltc=$( (xb-lnd-ltc $SYNCINFO |grep 'synced_to_chain'|awk '{ print $2 }') )
 
       sleep 1
  done
@@ -355,8 +358,12 @@ function checkSyncStatus() {
 
     while [ ${xsn_maxBlock::-1} -eq 0 ] || [ ${xsn_actBlock::-1} -ne ${xsn_maxBlock::-1} ] || [ ${ltc_maxBlock::-1} -eq 0 ] || [ ${ltc_actBlock::-1} -ne ${ltc_maxBlock::-1} ]
     do
-        echo "Waiting for XSN sync (${xsn_numCon::-1} Connections): ${xsn_actBlock::-1} / ${xsn_maxBlock::-1} .."
-        echo "Waiting for LTC sync (${ltc_numCon::-1} Connections): ${ltc_actBlock::-1} / ${ltc_maxBlock::-1} .."
+
+        echo -ne "═══════════════════════════
+Synchronisation Time: $(date)
+Waiting for XSN sync (${xsn_numCon::-1} Connections): ${xsn_actBlock::-1} / ${xsn_maxBlock::-1} ..
+Waiting for LTC sync (${ltc_numCon::-1} Connections): ${ltc_actBlock::-1} / ${ltc_maxBlock::-1} ..
+═══════════════════════════"\\033[4A\\r
 
         xsn_actBlock=$( ($XSN_CONFIGFOLDER/$XSN_CLIENT $BLOCKCHAININFO |grep 'blocks'|awk '{ print $2 }') )
         xsn_maxBlock=$( ($XSN_CONFIGFOLDER/$XSN_CLIENT $BLOCKCHAININFO |grep 'headers'|awk '{ print $2 }') )
@@ -368,17 +375,17 @@ function checkSyncStatus() {
 
         sleep 1
    done
-
-   echo "Sync finished!"
-   echo "XSN: ${xsn_actBlock::-1} / ${xsn_maxBlock::-1}"
-   echo "LTC: ${ltc_actBlock::-1} / ${ltc_maxBlock::-1}"
+   echo -e ""
+   echo -e "Sync finished!"
+   echo -e "XSN: ${xsn_actBlock::-1} / ${xsn_maxBlock::-1}"
+   echo -e "LTC: ${ltc_actBlock::-1} / ${ltc_maxBlock::-1}"
 }
 
 
 
 function menu() {
   #clear
-  #checks
+  checks
 
   echo -e "Lightning & Atomic Swaps script $SCRIPTVER (from Denon)"
   echo -e "════════════════════════════"

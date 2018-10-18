@@ -2,14 +2,10 @@
 #LTC_RPC_USER='Litecoin'
 #sed -i 's/user=xu/user="$LTC_RPC_USER"/g' ~/test.conf
 #sed -i "s|user=xu|user=$LTC_RPC_USER|g" ~/test.conf
-NAME="$HOME/git"
 
-function print() {
-    echo $1
-    return "Deren,Jochen"
-}
+LNDPATH="$HOME/lnd"
 
-print $NAME
-
-echo $1
-echo $2
+echo -e "alias xa-lnd-xsn='$LNDPATH/lncli --network $NETWORK --rpcserver=localhost:10003 --no-macaroons' " >> ~/Downloads/test.conf
+echo -e "alias xa-lnd-ltc='$LNDPATH/lncli --network $NETWORK --rpcserver=localhost:10001 --no-macaroons' " >> ~/Downloads/test.conf
+echo -e "alias xb-lnd-xsn='$LNDPATH/lncli --network $NETWORK --rpcserver=localhost:20003 --no-macaroons' " >> ~/Downloads/test.conf
+echo -e "alias xb-lnd-ltc='$LNDPATH/lncli --network $NETWORK --rpcserver=localhost:20001 --no-macaroons' " >> ~/Downloads/test.conf
