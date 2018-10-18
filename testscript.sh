@@ -5,11 +5,11 @@
 NAME="$HOME/git"
 
 function print() {
-  echo $1
-  echo $?
-  echo $1
-  #cd $1
-  ls
+    echo $1
+    return "Deren,Jochen"
 }
 
 print $NAME
+
+echo $1
+echo $2

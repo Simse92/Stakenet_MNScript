@@ -39,8 +39,12 @@ LNDPATH='$HOME/lndbin'
 
 RESOLVERPATH="$GOPATH/src/github.com/ExchangeUnion/swap-resolver"
 
+RETURN_VAR=""
+
 #commands
 BLOCKCHAININFO='getblockchaininfo'
+NETWORKINFO='getnetworkinfo'
+SYNCINFO='getinfo'
 
 function doFullSetup() {
   clear
@@ -49,15 +53,39 @@ function doFullSetup() {
   configureGOPath
 
   installGenWallet $LTC_CODE_NAME $LTC_FILE_NAME_TAR $LTC_FILE_NAME $LTC_CONFIGFOLDER $LTC_COIN_GIT $LTC_DAEMON $LTC_CLIENT
-  createGenConfig $LTC_CODE_NAME $LTC_RPC_USER $LTC_RPC_PASS $LTC_CONFIGFOLDER $LTC_ZMQ_BLOCK_PORT $LTC_ZMQ_TX_PORT
+  createGenConfig $LTC_CODE_NAME $LTC_CONFIGFOLDER $LTC_CONFIG_FILE $LTC_ZMQ_BLOCK_PORT $LTC_ZMQ_TX_PORT
+
+  IFS=';' read -ra ret_ltc <<< "$RETURN_VAR"
+  LTC_RPC_USER=${ret_ltc[0]}
+  LTC_RPC_PASS=${ret_ltc[1]}
+
   startGenWallet $LTC_CODE_NAME $LTC_CONFIGFOLDER $LTC_DAEMON $LTC_CLIENT
 
   installGenWallet $XSN_CODE_NAME $XSN_FILE_NAME_TAR $XSN_FILE_NAME $XSN_CONFIGFOLDER $XSN_COIN_GIT $XSN_DAEMON $XSN_CLIENT
-  createGenConfig $XSN_CODE_NAME $XSN_RPC_USER $XSN_RPC_PASS $XSN_CONFIGFOLDER $XSN_ZMQ_BLOCK_PORT $XSN_ZMQ_TX_PORT
+  createGenConfig $XSN_CODE_NAME $XSN_CONFIGFOLDER $XSN_CONFIG_FILE $XSN_ZMQ_BLOCK_PORT $XSN_ZMQ_TX_PORT
+
+  IFS=';' read -ra ret_xsn <<< "$RETURN_VAR"
+  XSN_RPC_USER=${ret_xsn[0]}
+  XSN_RPC_PASS=${ret_xsn[1]}
+
   startGenWallet $XSN_CODE_NAME $XSN_CONFIGFOLDER $XSN_DAEMON $XSN_CLIENT
+
+  if  [[ "$NETWORK" == "testnet" ]]; then
+    $XSN_CONFIGFOLDER/$XSN_CLIENT addnode 107.21.133.151 onetry
+    $XSN_CONFIGFOLDER/$XSN_CLIENT addnode ec2-34-228-111-185.compute-1.amazonaws.com onetry
+    $XSN_CONFIGFOLDER/$XSN_CLIENT addnode 34.228.111.185 onetry
+  fi
 
   installANDconfigureLNDDeamons
   installANDconfigureSwapResolver
+
+  #####
+  echo -e "${GREENTICK} Full setup finished. Now you can start the lighting daemons!"
+  echo -e ""
+  echo -e ""
+  menu
+  #####
+
 }
 
 function startGenWallet() {
@@ -90,20 +118,20 @@ function startGenWallet() {
 
 function createGenConfig() {
   #PARAMS
-  #1:COIN_CODE_NAME, 2:COIN_RPC_USER, 3:COIN_RPC_PASS, 4:COIN_CONFIGFOLDER,5:COIN_ZMQ_BLOCK_PORT, 6:COIN_ZMQ_TX_PORT
+  #1:COIN_CODE_NAME, 2:COIN_CONFIGFOLDER, 3:COIN_CONFIG_FILE 4:COIN_ZMQ_BLOCK_PORT, 5:COIN_ZMQ_TX_PORT
   echo -e "Generating $1 config.."
 
-  $2=$(openssl rand -hex 11)
-  $3=$(openssl rand -hex 20)
+  USER=$(openssl rand -hex 11)
+  PASSWORD=$(openssl rand -hex 20)
 
-cat << EOF > $(eval echo $3/$4)
+cat << EOF > $(eval echo $2/$3)
   #=========
   rpcallowip=127.0.0.1
-  rpcuser=$2
-  rpcpassword=$3
+  rpcuser=$USER
+  rpcpassword=$PASSWORD
   #=========
-  zmqpubrawblock=tcp://127.0.0.1:$5
-  zmqpubrawtx=tcp://127.0.0.1:$6
+  zmqpubrawblock=tcp://127.0.0.1:$4
+  zmqpubrawtx=tcp://127.0.0.1:$5
   #=========
   listen=1
   server=1
@@ -113,6 +141,8 @@ cat << EOF > $(eval echo $3/$4)
 
 EOF
   echo -e "$GREENTICK Finished $1 config configuration!"
+
+  RETURN_VAR="$USER;$PASSWORD"
 }
 
 function installGenWallet() {
@@ -271,9 +301,83 @@ function checks() {
      exit 1
   fi
 }
+################################################################################
+###############################Lightning########################################
+################################################################################
+function doLightningNetwork() {
+  checkSyncStatus
+  startLightningDaemons
+  checkSyncStatusLNWallets
+}
+
+function checkSyncStatusLNWallets()  {
+  xa_xsn=$( (xa-lnd-xsn $SYNCINFO |grep 'synced_to_chain'|awk '{ print $2 }') )
+  xb_xsn=$( (xb-lnd-xsn $SYNCINFO |grep 'synced_to_chain'|awk '{ print $2 }') )
+  xa_ltc=$( (xa-lnd-ltc $SYNCINFO |grep 'synced_to_chain'|awk '{ print $2 }') )
+  xb_ltc=$( (xb-lnd-ltc $SYNCINFO |grep 'synced_to_chain'|awk '{ print $2 }') )
+
+  while [[ ${xa_xsn::-1} == "false" ]] || [[ ${xb_xsn::-1} == "false" ]] || [[ ${xa_ltc::-1} == "false" ]] || [[ ${xb_ltc::-1} == "false" ]]
+  do
+      echo "Waiting for XSN sync (${xsn_numCon::-1} Connections): ${xsn_actBlock::-1} / ${xsn_maxBlock::-1} .."
+      echo "Waiting for LTC sync (${ltc_numCon::-1} Connections): ${ltc_actBlock::-1} / ${ltc_maxBlock::-1} .."
+
+      actBlock=$( ($XSN_CONFIGFOLDER/$XSN_CLIENT $BLOCKCHAININFO |grep 'blocks'|awk '{ print $2 }') )
+      maxBlock=$( ($XSN_CONFIGFOLDER/$XSN_CLIENT $BLOCKCHAININFO |grep 'headers'|awk '{ print $2 }') )
+      numCon=$( ($XSN_CONFIGFOLDER/$XSN_CLIENT $NETWORKINFO |grep 'connections'|awk '{ print $2 }') )
+
+      ltc_actBlock=$( ($LTC_CONFIGFOLDER/$LTC_CLIENT $BLOCKCHAININFO |grep 'blocks'|awk '{ print $2 }') )
+      ltc_maxBlock=$( ($LTC_CONFIGFOLDER/$LTC_CLIENT $BLOCKCHAININFO |grep 'headers'|awk '{ print $2 }') )
+      ltc_numCon=$( ($LTC_CONFIGFOLDER/$LTC_CLIENT $NETWORKINFO |grep 'connections'|awk '{ print $2 }') )
+
+      sleep 1
+ done
+ echo -e "All lightning daemons synced!"
+}
+
+function startLightningDaemons() {
+  2>/dev/null 1>/dev/null nohup $RESOLVERPATH/exchange-a/lnd/ltc/start.bash &
+  2>/dev/null 1>/dev/null nohup $RESOLVERPATH/exchange-a/lnd/xsn/start.bash &
+  2>/dev/null 1>/dev/null nohup $RESOLVERPATH/exchange-b/lnd/xsn/start.bash &
+  2>/dev/null 1>/dev/null nohup $RESOLVERPATH/exchange-b/lnd/ltc/start.bash &
+
+  2>/dev/null 1>/dev/null nohup $RESOLVERPATH/exchange-a/resolver/start.bash ltc_xsn &
+  2>/dev/null 1>/dev/null nohup $RESOLVERPATH/exchange-b/resolver/start.bash ltc_xsn &
+}
+
+function checkSyncStatus() {
+    xsn_actBlock=$( ($XSN_CONFIGFOLDER/$XSN_CLIENT $BLOCKCHAININFO |grep 'blocks'|awk '{ print $2 }') )
+    xsn_maxBlock=$( ($XSN_CONFIGFOLDER/$XSN_CLIENT $BLOCKCHAININFO |grep 'headers'|awk '{ print $2 }') )
+    xsn_numCon=$( ($XSN_CONFIGFOLDER/$XSN_CLIENT $NETWORKINFO |grep 'connections'|awk '{ print $2 }') )
+
+    ltc_actBlock=$( ($LTC_CONFIGFOLDER/$LTC_CLIENT $BLOCKCHAININFO |grep 'blocks'|awk '{ print $2 }') )
+    ltc_maxBlock=$( ($LTC_CONFIGFOLDER/$LTC_CLIENT $BLOCKCHAININFO |grep 'headers'|awk '{ print $2 }') )
+    ltc_numCon=$( ($LTC_CONFIGFOLDER/$LTC_CLIENT $NETWORKINFO |grep 'connections'|awk '{ print $2 }') )
+
+    while [ ${xsn_maxBlock::-1} -eq 0 ] || [ ${xsn_actBlock::-1} -ne ${xsn_maxBlock::-1} ] || [ ${ltc_maxBlock::-1} -eq 0 ] || [ ${ltc_actBlock::-1} -ne ${ltc_maxBlock::-1} ]
+    do
+        echo "Waiting for XSN sync (${xsn_numCon::-1} Connections): ${xsn_actBlock::-1} / ${xsn_maxBlock::-1} .."
+        echo "Waiting for LTC sync (${ltc_numCon::-1} Connections): ${ltc_actBlock::-1} / ${ltc_maxBlock::-1} .."
+
+        xsn_actBlock=$( ($XSN_CONFIGFOLDER/$XSN_CLIENT $BLOCKCHAININFO |grep 'blocks'|awk '{ print $2 }') )
+        xsn_maxBlock=$( ($XSN_CONFIGFOLDER/$XSN_CLIENT $BLOCKCHAININFO |grep 'headers'|awk '{ print $2 }') )
+        xsn_numCon=$( ($XSN_CONFIGFOLDER/$XSN_CLIENT $NETWORKINFO |grep 'connections'|awk '{ print $2 }') )
+
+        ltc_actBlock=$( ($LTC_CONFIGFOLDER/$LTC_CLIENT $BLOCKCHAININFO |grep 'blocks'|awk '{ print $2 }') )
+        ltc_maxBlock=$( ($LTC_CONFIGFOLDER/$LTC_CLIENT $BLOCKCHAININFO |grep 'headers'|awk '{ print $2 }') )
+        ltc_numCon=$( ($LTC_CONFIGFOLDER/$LTC_CLIENT $NETWORKINFO |grep 'connections'|awk '{ print $2 }') )
+
+        sleep 1
+   done
+
+   echo "Sync finished!"
+   echo "XSN: ${xsn_actBlock::-1} / ${xsn_maxBlock::-1}"
+   echo "LTC: ${ltc_actBlock::-1} / ${ltc_maxBlock::-1}"
+}
+
+
 
 function menu() {
-  clear
+  #clear
   #checks
 
   echo -e "Lightning & Atomic Swaps script $SCRIPTVER (from Denon)"
@@ -283,7 +387,7 @@ function menu() {
 
   echo -e "════════════════════════════"
   echo -e "1: Install full setup"
-  echo -e "2: tbd"
+  echo -e "2: Start lightning network"
   echo -e "3: tbd"
   echo -e "4: Exit"
   echo -e "════════════════════════════"
@@ -294,8 +398,8 @@ function menu() {
     "1") echo -e "Install full setup.."
          doFullSetup
     ;;
-    "2") echo -e "tbd"
-
+    "2") echo -e "Starting lightning network.."
+        doLightningNetwork
     ;;
     "3") echo -e "tbd"
 
