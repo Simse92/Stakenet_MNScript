@@ -4,9 +4,10 @@ SCRIPTVER=1.0.1
 WALLET_TIMEOUT_S=60
 NETWORK=""
 
-#Litecoin
+#litecoin
 LTC_CODE_NAME='LTC'
 LTC_DAEMON='litecoind'
+LTC_CLIENT='litecoin-cli'
 LTC_COIN_GIT='https://download.litecoin.org/litecoin-0.16.3/linux/litecoin-0.16.3-x86_64-linux-gnu.tar.gz'
 LTC_FILE_NAME_TAR='litecoin-0.16.3-x86_64-linux-gnu.tar.gz'
 LTC_FILE_NAME='litecoin-0.16.3'
@@ -14,10 +15,14 @@ LTC_CONFIGFOLDER="$HOME/.litecoin"
 LTC_CONFIG_FILE='litecoin.conf'
 LTC_RPC_USER=''
 LTC_RPC_PASS=''
+LTC_ZMQ_BLOCK_PORT='28332'
+LTC_ZMQ_TX_PORT='28333'
 
-#Stakenet
+
+#stakenet
 XSN_CODE_NAME='XSN'
 XSN_DAEMON='xsnd'
+XSN_CLIENT='xsn-cli'
 XSN_COIN_GIT='https://github.com/X9Developers/lnd/raw/master/wallets/xsn-1.0.16-x86_64-linux-gnu.tar.gz'
 XSN_FILE_NAME_TAR='xsn-1.0.16-x86_64-linux-gnu.tar.gz'
 XSN_FILE_NAME='xsn-1.0.16'
@@ -25,12 +30,17 @@ XSN_CONFIGFOLDER="$HOME/.xsncore"
 XSN_CONFIG_FILE='xsn.conf'
 XSN_RPC_USER=''
 XSN_RPC_PASS=''
+XSN_ZMQ_BLOCK_PORT='28444'
+XSN_ZMQ_TX_PORT='28445'
+
 
 LNDGIT='https://github.com/X9Developers/swap-resolver/releases/download/v1.0.0'
 LNDPATH='$HOME/lndbin'
 
-
 RESOLVERPATH="$GOPATH/src/github.com/ExchangeUnion/swap-resolver"
+
+#commands
+BLOCKCHAININFO='getblockchaininfo'
 
 function doFullSetup() {
   clear
@@ -38,26 +48,106 @@ function doFullSetup() {
   installDependencies
   configureGOPath
 
-  installLitecoin
-  createLitecoinConfig
-  startLitecoinDaemon
+  installGenWallet $LTC_CODE_NAME $LTC_FILE_NAME_TAR $LTC_FILE_NAME $LTC_CONFIGFOLDER $LTC_COIN_GIT $LTC_DAEMON $LTC_CLIENT
+  createGenConfig $LTC_CODE_NAME $LTC_RPC_USER $LTC_RPC_PASS $LTC_CONFIGFOLDER $LTC_ZMQ_BLOCK_PORT $LTC_ZMQ_TX_PORT
+  startGenWallet $LTC_CODE_NAME $LTC_CONFIGFOLDER $LTC_DAEMON $LTC_CLIENT
 
-  installXsn
-  createXsnConfig
-  startStakenetDaemon
+  installGenWallet $XSN_CODE_NAME $XSN_FILE_NAME_TAR $XSN_FILE_NAME $XSN_CONFIGFOLDER $XSN_COIN_GIT $XSN_DAEMON $XSN_CLIENT
+  createGenConfig $XSN_CODE_NAME $XSN_RPC_USER $XSN_RPC_PASS $XSN_CONFIGFOLDER $XSN_ZMQ_BLOCK_PORT $XSN_ZMQ_TX_PORT
+  startGenWallet $XSN_CODE_NAME $XSN_CONFIGFOLDER $XSN_DAEMON $XSN_CLIENT
 
   installANDconfigureLNDDeamons
   installANDconfigureSwapResolver
 }
 
-function startStakenetDaemon() {
-  echo -e "Starting $XSN_CODE_NAME daemon (takes up to $WALLET_TIMEOUT_S seconds).."
-  2>/dev/null 1>/dev/null $XSN_CONFIGFOLDER/$XSN_DAEMON
+function startGenWallet() {
+  #PARAMS
+  #1:COIN_CODE_NAME, 2:COIN_CONFIGFOLDER, 3:COIN_DAEMON, 4:COIN_CLIENT,
+  echo -e "Starting $1 daemon (takes up to $WALLET_TIMEOUT_S seconds).."
+  2>/dev/null 1>/dev/null $2/$3
+
+  # WaitOnServerStart
+  waitWallet="-1"
+  retryCounter=0
+  echo -ne "Waiting on $1 wallet${BLINK}..${OFF}"
+  while [[ $waitWallet -ne "0" && $retryCounter -lt $WALLET_TIMEOUT_S ]]
+  do
+    sleep 1
+    2>/dev/null 1>/dev/null $2/$4 $BLOCKCHAININFO
+    waitWallet="$?"
+    retryCounter=$[retryCounter+1]
+  done
+
+  echo -e \\r"Waiting on wallet.."
+  if [[ $retryCounter -ge $WALLET_TIMEOUT_S ]]; then
+    echo -e "${RED}ERROR:${OFF}"
+    printErrorLog
+    exit
+  else
+    echo -e "$GREENTICK $1 wallet startup successful!"
+  fi
 }
 
-function startLitecoinDaemon() {
-  echo -e "Starting $LTC_CODE_NAME daemon (takes up to $WALLET_TIMEOUT_S seconds).."
-  2>/dev/null 1>/dev/null $LTC_CONFIGFOLDER/$LTC_DAEMON
+function createGenConfig() {
+  #PARAMS
+  #1:COIN_CODE_NAME, 2:COIN_RPC_USER, 3:COIN_RPC_PASS, 4:COIN_CONFIGFOLDER,5:COIN_ZMQ_BLOCK_PORT, 6:COIN_ZMQ_TX_PORT
+  echo -e "Generating $1 config.."
+
+  $2=$(openssl rand -hex 11)
+  $3=$(openssl rand -hex 20)
+
+cat << EOF > $(eval echo $3/$4)
+  #=========
+  rpcallowip=127.0.0.1
+  rpcuser=$2
+  rpcpassword=$3
+  #=========
+  zmqpubrawblock=tcp://127.0.0.1:$5
+  zmqpubrawtx=tcp://127.0.0.1:$6
+  #=========
+  listen=1
+  server=1
+  daemon=1
+  $NETWORK=1
+  #=========
+
+EOF
+  echo -e "$GREENTICK Finished $1 config configuration!"
+}
+
+function installGenWallet() {
+  #PARAMS
+  # 1:COIN_CODE_NAME, 2:COIN_FILE_NAME_TAR, 3:COIN_FILE_NAME, 4:COIN_CONFIGFOLDER, 5:COIN_GIT, 6:COIN_DAEMON, 7:COIN_CLIENT
+  echo -e "Downloading and installing $1 daemon.."
+  rm -rf $2*
+
+  if [[ ! -d $( eval echo "$4" ) ]]; then
+    mkdir $( eval echo $4 )
+  fi
+
+  wget --progress=bar:force $5 2>&1 | progressfilt
+  if [ $? -ne 0 ]
+  then
+    echo -e "${RED}ERROR:${OFF} Failed to download $5!"
+    exit
+  fi
+
+  tar xfvz $2*  > /dev/null 2>&1
+  if [ $? -ne 0 ]
+  then
+    echo -e "${RED}ERROR:${OFF} Failed to unzip $2!"
+    exit
+  fi
+
+  cp $3/bin/$6 $4 > /dev/null 2>&1
+  cp $3/bin/$7 $4 > /dev/null 2>&1
+  chmod 777 $4/$6
+  chmod 777 $4/$7
+
+  #Clean up
+  rm -rf $3*
+
+  echo -e "$GREENTICK $1 daemon installation done!"
 }
 
 function installANDconfigureLNDDeamons() {
@@ -82,146 +172,33 @@ function installANDconfigureSwapResolver() {
 
   # Set rpcUserPass LTC
   sed -i "s|user=xu|user=$XSN_RPC_USER|g" $RESOLVERPATH/exchange-a/lnd/ltc/start.bash
-  sed -i "s|pass=xu|user=$XSN_RPC_PASS|g" $RESOLVERPATH/exchange-a/lnd/ltc/start.bash
+  sed -i "s|pass=xu|pass=$XSN_RPC_PASS|g" $RESOLVERPATH/exchange-a/lnd/ltc/start.bash
 
   sed -i "s|user=xu|user=$XSN_RPC_USER|g" $RESOLVERPATH/exchange-b/lnd/ltc/start.bash
-  sed -i "s|pass=xu|user=$XSN_RPC_PASS|g" $RESOLVERPATH/exchange-b/lnd/ltc/start.bash
+  sed -i "s|pass=xu|pass=$XSN_RPC_PASS|g" $RESOLVERPATH/exchange-b/lnd/ltc/start.bash
 
   ## Set network LTC
-  sed -i "s|testnet|user=$NETWORK|g" $RESOLVERPATH/exchange-a/lnd/ltc/start.bash
-  sed -i "s|testnet|user=$NETWORK|g" $RESOLVERPATH/exchange-b/lnd/ltc/start.bash
+  sed -i "s|testnet|$NETWORK|g" $RESOLVERPATH/exchange-a/lnd/ltc/start.bash
+  sed -i "s|testnet|$NETWORK|g" $RESOLVERPATH/exchange-b/lnd/ltc/start.bash
 
   ### Set daemon LTC
-  sed -i "s|lnd|user=$LNDPATH/lnd|g" $RESOLVERPATH/exchange-a/lnd/ltc/start.bash
-  sed -i "s|lnd|user=$LNDPATH/lnd|g" $RESOLVERPATH/exchange-b/lnd/ltc/start.bash
+  sed -i "s|lnd|$LNDPATH/lnd|g" $RESOLVERPATH/exchange-a/lnd/ltc/start.bash
+  sed -i "s|lnd|$LNDPATH/lnd|g" $RESOLVERPATH/exchange-b/lnd/ltc/start.bash
 
   # Set rpcUserPass XSN
   sed -i "s|user=xu|user=$XSN_RPC_USER|g" $RESOLVERPATH/exchange-a/lnd/xsn/start.bash
-  sed -i "s|pass=xu|user=$XSN_RPC_PASS|g" $RESOLVERPATH/exchange-a/lnd/xsn/start.bash
+  sed -i "s|pass=xu|pass=$XSN_RPC_PASS|g" $RESOLVERPATH/exchange-a/lnd/xsn/start.bash
 
   sed -i "s|user=xu|user=$XSN_RPC_USER|g" $RESOLVERPATH/exchange-b/lnd/xsn/start.bash
-  sed -i "s|pass=xu|user=$XSN_RPC_PASS|g" $RESOLVERPATH/exchange-b/lnd/xsn/start.bash
+  sed -i "s|pass=xu|pass=$XSN_RPC_PASS|g" $RESOLVERPATH/exchange-b/lnd/xsn/start.bash
 
   ## Set network XSN
-  sed -i "s|testnet|user=$NETWORK|g" $RESOLVERPATH/exchange-a/lnd/xsn/start.bash
-  sed -i "s|testnet|user=$NETWORK|g" $RESOLVERPATH/exchange-b/lnd/xsn/start.bash
+  sed -i "s|testnet|$NETWORK|g" $RESOLVERPATH/exchange-a/lnd/xsn/start.bash
+  sed -i "s|testnet|$NETWORK|g" $RESOLVERPATH/exchange-b/lnd/xsn/start.bash
 
   ### Set daemon XSN
-  sed -i "s|lnd|user=$LNDPATH/lnd_xsn|g" $RESOLVERPATH/exchange-a/lnd/xsn/start.bash
-  sed -i "s|lnd|user=$LNDPATH/lnd_xsn|g" $RESOLVERPATH/exchange-b/lnd/xsn/start.bash
-}
-
-
-function createXsnConfig() {
-  echo -e "Generating $XSN_CODE_NAME config.."
-
-  XSN_RPC_USER=$(openssl rand -hex 11)
-  XSN_RPC_PASS=$(openssl rand -hex 20)
-
-cat << EOF > $(eval echo $LTC_CONFIGFOLDER/$XSN_CONFIG_FILE)
-  #=========
-  rpcallowip=127.0.0.1
-  rpcuser=$XSN_RPC_USER
-  rpcpassword=$XSN_RPC_PASS
-  #=========
-  zmqpubrawblock=tcp://127.0.0.1:28444
-  zmqpubrawtx=tcp://127.0.0.1:28445
-  #=========
-  listen=1
-  server=1
-  daemon=1
-  #=========
-
-EOF
-  echo -e "$GREENTICK Finished $XSN_CONFIG_FILE configuration!"
-}
-
-function installXsn() {
-  echo -e "Downloading and installing XSN daemon.."
-  rm -rf $XSN_FILE_NAME_TAR*
-
-  if [[ ! -d $( eval echo "$XSN_CONFIGFOLDER" ) ]]; then
-    mkdir $( eval echo $XSN_CONFIGFOLDER )
-  fi
-
-  wget --progress=bar:force $XSN_COIN_GIT 2>&1 | progressfilt
-  if [ $? -ne 0 ]
-  then
-    echo -e "${RED}ERROR:${OFF} Failed to download $XSN_COIN_GIT!"
-    exit
-  fi
-
-  tar xfvz $XSN_FILE_NAME_TAR*  > /dev/null 2>&1
-  if [ $? -ne 0 ]
-  then
-    echo -e "${RED}ERROR:${OFF} Failed to unzip $XSN_FILE_NAME_TAR!"
-    exit
-  fi
-
-  cp $XSN_FILE_NAME/bin/xsnd $XSN_CONFIGFOLDER > /dev/null 2>&1
-  cp $XSN_FILE_NAME/bin/xsn-cli $XSN_CONFIGFOLDER > /dev/null 2>&1
-  chmod 777 $XSN_CONFIGFOLDER/xsn*
-
-  #Clean up
-  rm -rf $XSN_FILE_NAME*
-
-  echo -e "$GREENTICK XSN daemon installation done!"
-}
-
-function createLitecoinConfig() {
-  echo -e "Generating $LTC_CODE_NAME config.."
-
-  LTC_RPC_USER=$(openssl rand -hex 11)
-  LTC_RPC_PASS=$(openssl rand -hex 20)
-
-cat << EOF > $(eval echo $LTC_CONFIGFOLDER/$LTC_CONFIG_FILE)
-  #=========
-  rpcallowip=127.0.0.1
-  rpcuser=$LTC_RPC_USER
-  rpcpassword=$LTC_RPC_PASS
-  #=========
-  zmqpubrawblock=tcp://127.0.0.1:28332
-  zmqpubrawtx=tcp://127.0.0.1:28333
-  #=========
-  listen=1
-  daemon=1
-  server=1
-  #=========
-
-EOF
-  echo -e "$GREENTICK Finished $LTC_CONFIG_FILE configuration!"
-}
-
-function installLitecoin() {
-  echo -e "Downloading and installing LTC daemon.."
-  rm -rf $LTC_FILE_NAME_TAR*
-
-  if [[ ! -d $( eval echo "$LTC_CONFIGFOLDER" ) ]]; then
-    mkdir $( eval echo $LTC_CONFIGFOLDER )
-  fi
-
-  wget --progress=bar:force $LTC_COIN_GIT 2>&1 | progressfilt
-  if [ $? -ne 0 ]
-  then
-    echo -e "${RED}ERROR:${OFF} Failed to download $LTC_COIN_GIT!"
-    exit
-  fi
-
-  tar xfvz $LTC_FILE_NAME_TAR*  > /dev/null 2>&1
-  if [ $? -ne 0 ]
-  then
-    echo -e "${RED}ERROR:${OFF} Failed to unzip $LTC_FILE_NAME_TAR!"
-    exit
-  fi
-
-  cp $LTC_FILE_NAME/bin/litecoind $LTC_CONFIGFOLDER > /dev/null 2>&1
-  cp $LTC_FILE_NAME/bin/litecoin-cli $LTC_CONFIGFOLDER > /dev/null 2>&1
-  chmod 777 $LTC_CONFIGFOLDER/litecoin*
-
-  #Clean up
-  rm -rf $LTC_FILE_NAME*
-
-  echo -e "$GREENTICK LTC daemon installation done!"
+  sed -i "s|lnd|$LNDPATH/lnd_xsn|g" $RESOLVERPATH/exchange-a/lnd/xsn/start.bash
+  sed -i "s|lnd|$LNDPATH/lnd_xsn|g" $RESOLVERPATH/exchange-b/lnd/xsn/start.bash
 }
 
 # ToDo Was machen wenn es schon drin ist?
