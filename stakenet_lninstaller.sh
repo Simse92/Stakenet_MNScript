@@ -2,7 +2,18 @@
 SCRIPTVER=1.0.1
 
 WALLET_TIMEOUT_S=60
-NETWORK=""
+NETWORK='testnet'
+
+#logging
+DATE_STAMP="$(date +%y-%m-%d-%s)"
+SCRIPT_LOGFOLDER="/tmp/ln_install_${DATE_STAMP}_log/"
+SCRIPT_INTERNAL_LOGFILE="${SCRIPT_LOGFOLDER}/script.log"
+SCRIPT_XA_LTC_LOGFILE="${SCRIPT_LOGFOLDER}/xa_ltc.log"
+SCRIPT_XA_XSN_LOGFILE="${SCRIPT_LOGFOLDER}/xa_xsn.log"
+SCRIPT_XA_RESOLVER_LOGFILE="${SCRIPT_LOGFOLDER}/xa_resolver.log"
+SCRIPT_XB_LTC_LOGFILE="${SCRIPT_LOGFOLDER}/xb_ltc.log"
+SCRIPT_XB_XSN_LOGFILE="${SCRIPT_LOGFOLDER}/xb_xsn.log"
+SCRIPT_XB_RESOLVER_LOGFILE="${SCRIPT_LOGFOLDER}/xb_resolver.log"
 
 #litecoin
 LTC_CODE_NAME='LTC'
@@ -46,9 +57,18 @@ BLOCKCHAININFO='getblockchaininfo'
 NETWORKINFO='getnetworkinfo'
 SYNCINFO='getinfo'
 
+#Console commands
+GREENTICK='\033[0;32m\xE2\x9C\x94\033[0m'
+CURSOR_PREVIOUS_LINE='\033[1A'
+RED='\E[31m'
+GREEN='\E[32m'
+BLINK='\E[5m'
+OFF='\E[0m'
+
 function doFullSetup() {
   clear
-  networkRequest
+  deleteOldInstallation
+  #networkRequest
   installDependencies
   configureGOPath
 
@@ -88,11 +108,60 @@ function doFullSetup() {
 
 }
 
+function establishConnection() {
+    echo -e "Establishing connection between exchanges.."
+
+    XB_XSN_PUBKEY=`xb-lnd-xsn getinfo|grep identity_pubkey|cut -d '"' -f 4`
+    XB_LTC_PUBKEY=`xb-lnd-ltc getinfo|grep identity_pubkey|cut -d '"' -f 4`
+
+    xa-lnd-xsn connect $XB_XSN_PUBKEY@127.0.0.1:20013
+    xa-lnd-ltc connect $XB_LTC_PUBKEY@127.0.0.1:20011
+
+    echo -e "$GREENTICK Connection establishment successful!"
+}
+
+function deleteOldInstallation() {
+
+#delete alias entries
+#delete go path entry
+#kill all daemons (wallets & lightning & resolver)
+
+  ps aux | grep -ie lnd | awk '{print $2}' | xargs kill -9
+  stopDaemon $XSN_DAEMON $XSN_CONFIGFOLDER $XSN_CLIENT
+  stopDaemon $LTC_DAEMON $LTC_CONFIGFOLDER $LTC_CLIENT
+
+  rm -r $XSN_CONFIGFOLDER
+  rm -r $LTC_CONFIGFOLDER
+  rm -r $LNDPATH
+  rm -r $GOPATH/src/github.com/ExchangeUnion
+
+  sed -i '/GOPATH/d' ~/.bashrc
+  sed -i '/go/d' ~/.bashrc
+
+  sed -i '/xa-lnd-xsn/d' ~/.profile
+  sed -i '/xb-lnd-xsn/d' ~/.profile
+  sed -i '/xa-lnd-ltc/d' ~/.profile
+  sed -i '/xb-lnd-ltc/d' ~/.profile
+}
+
+function stopDaemon() {
+  #PARAMS
+  #1:COIN_DAEMON, 2: COIN_CONFIGFOLDER, 3:COIN_CLIENT
+  if [[ ! -z "$(ps axo cmd:100 | egrep $1 | grep ^[^grep])" ]]; then
+    $2/$3 stop
+
+    while [[ -z "$(ps axo cmd:100 | egrep $1 | grep ^[^grep])" ]]
+    do
+      sleep 1
+    done
+  fi
+}
+
 function startGenWallet() {
   #PARAMS
   #1:COIN_CODE_NAME, 2:COIN_CONFIGFOLDER, 3:COIN_DAEMON, 4:COIN_CLIENT,
   echo -e "Starting $1 daemon (takes up to $WALLET_TIMEOUT_S seconds).."
-  2>/dev/null 1>/dev/null $2/$3
+  $2/$3
 
   # WaitOnServerStart
   waitWallet="-1"
@@ -101,7 +170,7 @@ function startGenWallet() {
   while [[ $waitWallet -ne "0" && $retryCounter -lt $WALLET_TIMEOUT_S ]]
   do
     sleep 1
-    2>/dev/null 1>/dev/null $2/$4 $BLOCKCHAININFO
+    $2/$4 $BLOCKCHAININFO
     waitWallet="$?"
     retryCounter=$[retryCounter+1]
   done
@@ -162,15 +231,15 @@ function installGenWallet() {
     exit
   fi
 
-  tar xfvz $2*  > /dev/null 2>&1
+  tar xfvz $2*
   if [ $? -ne 0 ]
   then
     echo -e "${RED}ERROR:${OFF} Failed to unzip $2!"
     exit
   fi
 
-  cp $3/bin/$6 $4 > /dev/null 2>&1
-  cp $3/bin/$7 $4 > /dev/null 2>&1
+  cp $3/bin/$6 $4
+  cp $3/bin/$7 $4
   chmod 777 $4/$6
   chmod 777 $4/$7
 
@@ -231,7 +300,6 @@ function installANDconfigureSwapResolver() {
   sed -i "s|lnd|$LNDPATH/lnd_xsn|g" $RESOLVERPATH/exchange-b/lnd/xsn/start.bash
 }
 
-# ToDo Was machen wenn es schon drin ist?
 function configureGOPath() {
     echo -e "export GOPATH=$HOME/go" >> ~/.bashrc
     echo -e "export PATH=/usr/bin/go/bin:$GOPATH/bin:$PATH" >> ~/.bashrc
@@ -240,9 +308,9 @@ function configureGOPath() {
 
 function installDependencies() {
     echo -ne "Installing dependencies${BLINK}..${OFF}"
-    echo "y" | apt update > /dev/null 2>&1
-    echo "y" | apt upgrade > /dev/null 2>&1
-    echo "y" | apt install -y ufw python virtualenv git unzip pv golang-go > /dev/null 2>&1
+    echo "y" | apt update
+    echo "y" | apt upgrade
+    echo "y" | apt install -y ufw python virtualenv git unzip pv golang-go
     echo -e \\r"Installing dependencies.."
     echo -e "$GREENTICK Dependency install done!"
 }
@@ -305,9 +373,21 @@ function checks() {
 ###############################Lightning########################################
 ################################################################################
 function doLightningNetwork() {
+  checkIfCoreWalletIsUp $XSN_DAEMON $XSN_CODE_NAME
+  checkIfCoreWalletIsUp $LTC_DAEMON $LTC_CODE_NAME
   checkSyncStatus
   startLightningDaemons
   checkSyncStatusLNWallets
+}
+
+
+function checkIfCoreWalletIsUp() {
+  #PARAMS
+  # 1:COIN_DAEMON, 2:COIN_NAME
+  if [[ -z "$(ps axo cmd:100 | egrep $1 | grep ^[^grep])" ]]; then
+    echo -e "${RED}ERROR:${OFF} $2 wallet not runnning."
+    exit
+  fi
 }
 
 function checkSyncStatusLNWallets()  {
@@ -338,13 +418,13 @@ Waiting for LTC-Lightning Exchange B: Synced to chain: ${xb_ltc::-1}
 }
 
 function startLightningDaemons() {
-  2>/dev/null 1>/dev/null nohup $RESOLVERPATH/exchange-a/lnd/ltc/start.bash &
-  2>/dev/null 1>/dev/null nohup $RESOLVERPATH/exchange-a/lnd/xsn/start.bash &
-  2>/dev/null 1>/dev/null nohup $RESOLVERPATH/exchange-b/lnd/xsn/start.bash &
-  2>/dev/null 1>/dev/null nohup $RESOLVERPATH/exchange-b/lnd/ltc/start.bash &
+  nohup $RESOLVERPATH/exchange-a/lnd/ltc/start.bash &> ${SCRIPT_XA_LTC_LOGFILE} &
+  nohup $RESOLVERPATH/exchange-a/lnd/xsn/start.bash &> ${SCRIPT_XA_XSN_LOGFILE} &
+  nohup $RESOLVERPATH/exchange-b/lnd/xsn/start.bash &> ${SCRIPT_XB_XSN_LOGFILE} &
+  nohup $RESOLVERPATH/exchange-b/lnd/ltc/start.bash &> ${SCRIPT_XB_LTC_LOGFILE} &
 
-  2>/dev/null 1>/dev/null nohup $RESOLVERPATH/exchange-a/resolver/start.bash ltc_xsn &
-  2>/dev/null 1>/dev/null nohup $RESOLVERPATH/exchange-b/resolver/start.bash ltc_xsn &
+  nohup $RESOLVERPATH/exchange-a/resolver/start.bash ltc_xsn &> ${SCRIPT_XA_RESOLVER_LOGFILE} &
+  nohup $RESOLVERPATH/exchange-b/resolver/start.bash ltc_xsn &> ${SCRIPT_XB_RESOLVER_LOGFILE} &
 }
 
 function checkSyncStatus() {
@@ -384,6 +464,7 @@ Waiting for LTC sync (${ltc_numCon::-1} Connections): ${ltc_actBlock::-1} / ${lt
 
 
 function menu() {
+  mkdir $SCRIPT_LOGFOLDER
   #clear
   checks
 
@@ -395,8 +476,7 @@ function menu() {
   echo -e "════════════════════════════"
   echo -e "1: Install full setup"
   echo -e "2: Start lightning network"
-  echo -e "3: tbd"
-  echo -e "4: Exit"
+  echo -e "3: Exit"
   echo -e "════════════════════════════"
 
   #PS3="Ihre Wahl : "
@@ -406,13 +486,10 @@ function menu() {
          doFullSetup
     ;;
     "2") echo -e "Starting lightning network.."
+        #startLightningDaemons
         doLightningNetwork
     ;;
-    "3") echo -e "tbd"
-
-    ;;
-
-    "4") exit
+    "3") exit
     ;;
 
     *) echo -e "${RED}ERROR:${OFF} Invalid option";;
