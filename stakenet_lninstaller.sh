@@ -134,11 +134,10 @@ function deleteOldInstallation() {
   sed -i '/GOPATH/d' ~/.bashrc
   sed -i '/go/d' ~/.bashrc
 
-#TODO
-  sed -i '/xa-lnd-xsn/d' ~/.profile
-  sed -i '/xb-lnd-xsn/d' ~/.profile
-  sed -i '/xa-lnd-ltc/d' ~/.profile
-  sed -i '/xb-lnd-ltc/d' ~/.profile
+  rm /usr/local/bin/xa-lnd-xsn
+  rm /usr/local/bin/xb-lnd-xsn
+  rm /usr/local/bin/xa-lnd-ltc
+  rm /usr/local/bin/xb-lnd-ltc
 }
 
 function stopDaemon() {
@@ -419,15 +418,22 @@ Waiting for LTC-Lightning Exchange B: Synced to chain: ${xb_ltc::-1}
 }
 
 function startLightningDaemons() {
-  nohup $RESOLVERPATH/exchange-a/lnd/ltc/start.bash &> ${SCRIPT_XA_LTC_LOGFILE} &
-  nohup $RESOLVERPATH/exchange-a/lnd/xsn/start.bash &> ${SCRIPT_XA_XSN_LOGFILE} &
-  nohup $RESOLVERPATH/exchange-b/lnd/xsn/start.bash &> ${SCRIPT_XB_XSN_LOGFILE} &
-  nohup $RESOLVERPATH/exchange-b/lnd/ltc/start.bash &> ${SCRIPT_XB_LTC_LOGFILE} &
+  cd $RESOLVERPATH/exchange-a/lnd/xsn/
+  nohup ./start.bash 2>/dev/null 1>/dev/null & #${SCRIPT_XA_XSN_LOGFILE} &
+  cd $RESOLVERPATH/exchange-b/lnd/xsn/
+  nohup ./start.bash 2>/dev/null 1>/dev/null & # ${SCRIPT_XB_XSN_LOGFILE} &
 
-  nohup $RESOLVERPATH/exchange-a/resolver/start.bash ltc_xsn &> ${SCRIPT_XA_RESOLVER_LOGFILE} &
-  nohup $RESOLVERPATH/exchange-b/resolver/start.bash ltc_xsn &> ${SCRIPT_XB_RESOLVER_LOGFILE} &
+  cd $RESOLVERPATH/exchange-a/lnd/ltc/
+  nohup ./start.bash 2>/dev/null 1>/dev/null & # ${SCRIPT_XA_LTC_LOGFILE} &
+  cd $RESOLVERPATH/exchange-b/lnd/ltc/
+  nohup ./start.bash 2>/dev/null 1>/dev/null & # ${SCRIPT_XB_LTC_LOGFILE} &
 
-  sleep 10
+  cd $RESOLVERPATH/exchange-a/resolver/
+  nohup ./start.bash ltc_xsn 2>/dev/null 1>/dev/null & # ${SCRIPT_XA_RESOLVER_LOGFILE} &
+  cd $RESOLVERPATH/exchange-b/resolver/
+  nohup ./start.bash ltc_xsn 2>/dev/null 1>/dev/null & # ${SCRIPT_XB_RESOLVER_LOGFILE} &
+
+  sleep 5
 }
 
 function checkSyncStatus() {
