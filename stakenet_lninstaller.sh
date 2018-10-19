@@ -122,10 +122,6 @@ function establishConnection() {
 
 function deleteOldInstallation() {
 
-#delete alias entries
-#delete go path entry
-#kill all daemons (wallets & lightning & resolver)
-
   ps aux | grep -ie lnd | awk '{print $2}' | xargs kill -9
   stopDaemon $XSN_DAEMON $XSN_CONFIGFOLDER $XSN_CLIENT
   stopDaemon $LTC_DAEMON $LTC_CONFIGFOLDER $LTC_CLIENT
@@ -138,6 +134,7 @@ function deleteOldInstallation() {
   sed -i '/GOPATH/d' ~/.bashrc
   sed -i '/go/d' ~/.bashrc
 
+#TODO
   sed -i '/xa-lnd-xsn/d' ~/.profile
   sed -i '/xb-lnd-xsn/d' ~/.profile
   sed -i '/xa-lnd-ltc/d' ~/.profile
@@ -257,12 +254,14 @@ function installANDconfigureLNDDeamons() {
 
   chmod 777 $LNDPATH/ln*
 
-  # Adding lncli aliases
-  echo -e "alias xa-lnd-xsn='$LNDPATH/lncli --network $NETWORK --rpcserver=localhost:10003 --no-macaroons' " >> ~/.profile
-  echo -e "alias xa-lnd-ltc='$LNDPATH/lncli --network $NETWORK --rpcserver=localhost:10001 --no-macaroons' " >> ~/.profile
-  echo -e "alias xb-lnd-xsn='$LNDPATH/lncli --network $NETWORK --rpcserver=localhost:20003 --no-macaroons' " >> ~/.profile
-  echo -e "alias xb-lnd-ltc='$LNDPATH/lncli --network $NETWORK --rpcserver=localhost:20001 --no-macaroons' " >> ~/.profile
-  source ~/.profile
+  # Adding lncli commands
+  echo -e "$LNDPATH/lncli --network $NETWORK --rpcserver=localhost:10003 --no-macaroons \"\$@\" " >> /usr/local/bin/xa-lnd-xsn
+  echo -e "$LNDPATH/lncli --network $NETWORK --rpcserver=localhost:10001 --no-macaroons \"\$@\" " >> /usr/local/bin/xa-lnd-ltc
+  echo -e "$LNDPATH/lncli --network $NETWORK --rpcserver=localhost:20003 --no-macaroons \"\$@\" " >> /usr/local/bin/xb-lnd-xsn
+  echo -e "$LNDPATH/lncli --network $NETWORK --rpcserver=localhost:20001 --no-macaroons \"\$@\" " >> /usr/local/bin/xb-lnd-ltc
+
+
+  chmod 777 /usr/local/bin/x*
 }
 
 function installANDconfigureSwapResolver() {
@@ -396,7 +395,9 @@ function checkSyncStatusLNWallets()  {
   xa_ltc=$( (xa-lnd-ltc $SYNCINFO |grep 'synced_to_chain'|awk '{ print $2 }') )
   xb_ltc=$( (xb-lnd-ltc $SYNCINFO |grep 'synced_to_chain'|awk '{ print $2 }') )
 
-  while [[ ${xa_xsn::-1} == "false" ]] || [[ ${xb_xsn::-1} == "false" ]] || [[ ${xa_ltc::-1} == "false" ]] || [[ ${xb_ltc::-1} == "false" ]]
+    echo -e "Test: ${xb_xsn%,}"
+
+  while [[ ${xa_xsn%,} == "false" ]] || [[ ${xb_xsn%,} == "false" ]] || [[ ${xa_ltc%,} == "false" ]] || [[ ${xb_ltc%,} == "false" ]]
   do
 
       echo -ne "═══════════════════════════
@@ -425,6 +426,8 @@ function startLightningDaemons() {
 
   nohup $RESOLVERPATH/exchange-a/resolver/start.bash ltc_xsn &> ${SCRIPT_XA_RESOLVER_LOGFILE} &
   nohup $RESOLVERPATH/exchange-b/resolver/start.bash ltc_xsn &> ${SCRIPT_XB_RESOLVER_LOGFILE} &
+
+  sleep 10
 }
 
 function checkSyncStatus() {
