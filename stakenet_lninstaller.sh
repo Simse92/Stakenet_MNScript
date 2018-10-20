@@ -91,9 +91,9 @@ function doFullSetup() {
   startGenWallet $XSN_CODE_NAME $XSN_CONFIGFOLDER $XSN_DAEMON $XSN_CLIENT
 
   if  [[ "$NETWORK" == "testnet" ]]; then
-    $XSN_CONFIGFOLDER/$XSN_CLIENT addnode 107.21.133.151 onetry
-    $XSN_CONFIGFOLDER/$XSN_CLIENT addnode ec2-34-228-111-185.compute-1.amazonaws.com onetry
-    $XSN_CONFIGFOLDER/$XSN_CLIENT addnode 34.228.111.185 onetry
+  $XSN_CONFIGFOLDER/$XSN_CLIENT addnode 107.21.133.151 onetry
+  $XSN_CONFIGFOLDER/$XSN_CLIENT addnode ec2-34-228-111-185.compute-1.amazonaws.com onetry
+  $XSN_CONFIGFOLDER/$XSN_CLIENT addnode 34.228.111.185 onetry
   fi
 
   installANDconfigureLNDDeamons
@@ -108,48 +108,36 @@ function doFullSetup() {
 
 }
 
-function establishConnection() {
-    echo -e "Establishing connection between exchanges.."
-
-    XB_XSN_PUBKEY=`xb-lnd-xsn getinfo|grep identity_pubkey|cut -d '"' -f 4`
-    XB_LTC_PUBKEY=`xb-lnd-ltc getinfo|grep identity_pubkey|cut -d '"' -f 4`
-
-    xa-lnd-xsn connect $XB_XSN_PUBKEY@127.0.0.1:20013
-    xa-lnd-ltc connect $XB_LTC_PUBKEY@127.0.0.1:20011
-
-    echo -e "$GREENTICK Connection establishment successful!"
-}
-
 function deleteOldInstallation() {
 
-  ps aux | grep -ie lnd | awk '{print $2}' | xargs kill -9
+  ps aux | grep -ie lnd | awk '{print $2}' | xargs kill -9 &>> ${SCRIPT_INTERNAL_LOGFILE}
   stopDaemon $XSN_DAEMON $XSN_CONFIGFOLDER $XSN_CLIENT
   stopDaemon $LTC_DAEMON $LTC_CONFIGFOLDER $LTC_CLIENT
 
-  rm -r $XSN_CONFIGFOLDER
-  rm -r $LTC_CONFIGFOLDER
-  rm -r $LNDPATH
-  rm -r $GOPATH/src/github.com/ExchangeUnion
+  rm -r $XSN_CONFIGFOLDER &>> ${SCRIPT_INTERNAL_LOGFILE}
+  rm -r $LTC_CONFIGFOLDER &>> ${SCRIPT_INTERNAL_LOGFILE}
+  rm -r $LNDPATH &>> ${SCRIPT_INTERNAL_LOGFILE}
+  rm -r $GOPATH/src/github.com/ExchangeUnion &>> ${SCRIPT_INTERNAL_LOGFILE}
 
-  sed -i '/GOPATH/d' ~/.bashrc
-  sed -i '/go/d' ~/.bashrc
+  sed -i '/GOPATH/d' ~/.bashrc &>> ${SCRIPT_INTERNAL_LOGFILE}
+  sed -i '/go/d' ~/.bashrc &>> ${SCRIPT_INTERNAL_LOGFILE}
 
-  rm /usr/local/bin/xa-lnd-xsn
-  rm /usr/local/bin/xb-lnd-xsn
-  rm /usr/local/bin/xa-lnd-ltc
-  rm /usr/local/bin/xb-lnd-ltc
+  rm /usr/local/bin/xa-lnd-xsn &>> ${SCRIPT_INTERNAL_LOGFILE}
+  rm /usr/local/bin/xb-lnd-xsn &>> ${SCRIPT_INTERNAL_LOGFILE}
+  rm /usr/local/bin/xa-lnd-ltc &>> ${SCRIPT_INTERNAL_LOGFILE}
+  rm /usr/local/bin/xb-lnd-ltc &>> ${SCRIPT_INTERNAL_LOGFILE}
 }
 
 function stopDaemon() {
   #PARAMS
   #1:COIN_DAEMON, 2: COIN_CONFIGFOLDER, 3:COIN_CLIENT
   if [[ ! -z "$(ps axo cmd:100 | egrep $1 | grep ^[^grep])" ]]; then
-    $2/$3 stop
+    $2/$3 stop &>> ${SCRIPT_INTERNAL_LOGFILE}
 
-    while [[ -z "$(ps axo cmd:100 | egrep $1 | grep ^[^grep])" ]]
-    do
-      sleep 1
-    done
+  while [[ -z "$(ps axo cmd:100 | egrep $1 | grep ^[^grep])" ]]
+  do
+    sleep 1
+  done
   fi
 }
 
@@ -157,7 +145,7 @@ function startGenWallet() {
   #PARAMS
   #1:COIN_CODE_NAME, 2:COIN_CONFIGFOLDER, 3:COIN_DAEMON, 4:COIN_CLIENT,
   echo -e "Starting $1 daemon (takes up to $WALLET_TIMEOUT_S seconds).."
-  $2/$3
+  $2/$3 &>> ${SCRIPT_INTERNAL_LOGFILE}
 
   # WaitOnServerStart
   waitWallet="-1"
@@ -214,10 +202,10 @@ function installGenWallet() {
   #PARAMS
   # 1:COIN_CODE_NAME, 2:COIN_FILE_NAME_TAR, 3:COIN_FILE_NAME, 4:COIN_CONFIGFOLDER, 5:COIN_GIT, 6:COIN_DAEMON, 7:COIN_CLIENT
   echo -e "Downloading and installing $1 daemon.."
-  rm -rf $2*
+  rm -rf $2* &>> ${SCRIPT_INTERNAL_LOGFILE}
 
   if [[ ! -d $( eval echo "$4" ) ]]; then
-    mkdir $( eval echo $4 )
+    mkdir $( eval echo $4 ) &>> ${SCRIPT_INTERNAL_LOGFILE}
   fi
 
   wget --progress=bar:force $5 2>&1 | progressfilt
@@ -227,31 +215,31 @@ function installGenWallet() {
     exit
   fi
 
-  tar xfvz $2*
+  tar xfvz $2* &>> ${SCRIPT_INTERNAL_LOGFILE}
   if [ $? -ne 0 ]
   then
     echo -e "${RED}ERROR:${OFF} Failed to unzip $2!"
     exit
   fi
 
-  cp $3/bin/$6 $4
-  cp $3/bin/$7 $4
-  chmod 777 $4/$6
-  chmod 777 $4/$7
+  cp $3/bin/$6 $4 &>> ${SCRIPT_INTERNAL_LOGFILE}
+  cp $3/bin/$7 $4 &>> ${SCRIPT_INTERNAL_LOGFILE}
+  chmod 777 $4/$6 &>> ${SCRIPT_INTERNAL_LOGFILE}
+  chmod 777 $4/$7 &>> ${SCRIPT_INTERNAL_LOGFILE}
 
   #Clean up
-  rm -rf $3*
+  rm -rf $3* &>> ${SCRIPT_INTERNAL_LOGFILE}
 
   echo -e "$GREENTICK $1 daemon installation done!"
 }
 
 function installANDconfigureLNDDeamons() {
-  mkdir $LNDPATH
-  wget $LNDGIT/lncli -P $LNDPATH
-  wget $LNDGIT/lnd -P $LNDPATH
-  wget $LNDGIT/lnd_xsn -P $LNDPATH
+  mkdir $LNDPATH &>> ${SCRIPT_INTERNAL_LOGFILE}
+  wget $LNDGIT/lncli -P $LNDPATH &>> ${SCRIPT_INTERNAL_LOGFILE}
+  wget $LNDGIT/lnd -P $LNDPATH &>> ${SCRIPT_INTERNAL_LOGFILE}
+  wget $LNDGIT/lnd_xsn -P $LNDPATH &>> ${SCRIPT_INTERNAL_LOGFILE}
 
-  chmod 777 $LNDPATH/ln*
+  chmod 777 $LNDPATH/ln* &>> ${SCRIPT_INTERNAL_LOGFILE}
 
   # Adding lncli commands
   echo -e "$LNDPATH/lncli --network $NETWORK --rpcserver=localhost:10003 --no-macaroons \"\$@\" " >> /usr/local/bin/xa-lnd-xsn
@@ -260,57 +248,57 @@ function installANDconfigureLNDDeamons() {
   echo -e "$LNDPATH/lncli --network $NETWORK --rpcserver=localhost:20001 --no-macaroons \"\$@\" " >> /usr/local/bin/xb-lnd-ltc
 
 
-  chmod 777 /usr/local/bin/x*
+  chmod 777 /usr/local/bin/x* &>> ${SCRIPT_INTERNAL_LOGFILE}
 }
 
 function installANDconfigureSwapResolver() {
   echo -e "Installing Swap-Resolver.."
-  git clone https://github.com/X9Developers/swap-resolver.git $GOPATH/src/github.com/ExchangeUnion/swap-resolver
+  git clone https://github.com/X9Developers/swap-resolver.git $GOPATH/src/github.com/ExchangeUnion/swap-resolver &>> ${SCRIPT_INTERNAL_LOGFILE}
 
   # Set rpcUserPass LTC
-  sed -i "s|user=xu|user=$LTC_RPC_USER|g" $RESOLVERPATH/exchange-a/lnd/ltc/start.bash
-  sed -i "s|pass=xu|pass=$LTC_RPC_PASS|g" $RESOLVERPATH/exchange-a/lnd/ltc/start.bash
+  sed -i "s|user=xu|user=$LTC_RPC_USER|g" $RESOLVERPATH/exchange-a/lnd/ltc/start.bash &>> ${SCRIPT_INTERNAL_LOGFILE}
+  sed -i "s|pass=xu|pass=$LTC_RPC_PASS|g" $RESOLVERPATH/exchange-a/lnd/ltc/start.bash &>> ${SCRIPT_INTERNAL_LOGFILE}
 
-  sed -i "s|user=xu|user=$LTC_RPC_USER|g" $RESOLVERPATH/exchange-b/lnd/ltc/start.bash
-  sed -i "s|pass=xu|pass=$LTC_RPC_PASS|g" $RESOLVERPATH/exchange-b/lnd/ltc/start.bash
+  sed -i "s|user=xu|user=$LTC_RPC_USER|g" $RESOLVERPATH/exchange-b/lnd/ltc/start.bash &>> ${SCRIPT_INTERNAL_LOGFILE}
+  sed -i "s|pass=xu|pass=$LTC_RPC_PASS|g" $RESOLVERPATH/exchange-b/lnd/ltc/start.bash &>> ${SCRIPT_INTERNAL_LOGFILE}
 
   ## Set network LTC
-  sed -i "s|testnet|$NETWORK|g" $RESOLVERPATH/exchange-a/lnd/ltc/start.bash
-  sed -i "s|testnet|$NETWORK|g" $RESOLVERPATH/exchange-b/lnd/ltc/start.bash
+  sed -i "s|testnet|$NETWORK|g" $RESOLVERPATH/exchange-a/lnd/ltc/start.bash &>> ${SCRIPT_INTERNAL_LOGFILE}
+  sed -i "s|testnet|$NETWORK|g" $RESOLVERPATH/exchange-b/lnd/ltc/start.bash &>> ${SCRIPT_INTERNAL_LOGFILE}
 
   ### Set daemon LTC
-  sed -i "s|lnd|$LNDPATH/lnd|g" $RESOLVERPATH/exchange-a/lnd/ltc/start.bash
-  sed -i "s|lnd|$LNDPATH/lnd|g" $RESOLVERPATH/exchange-b/lnd/ltc/start.bash
+  sed -i "s|lnd|$LNDPATH/lnd|g" $RESOLVERPATH/exchange-a/lnd/ltc/start.bash &>> ${SCRIPT_INTERNAL_LOGFILE}
+  sed -i "s|lnd|$LNDPATH/lnd|g" $RESOLVERPATH/exchange-b/lnd/ltc/start.bash &>> ${SCRIPT_INTERNAL_LOGFILE}
 
   # Set rpcUserPass XSN
-  sed -i "s|user=xu|user=$XSN_RPC_USER|g" $RESOLVERPATH/exchange-a/lnd/xsn/start.bash
-  sed -i "s|pass=xu|pass=$XSN_RPC_PASS|g" $RESOLVERPATH/exchange-a/lnd/xsn/start.bash
+  sed -i "s|user=xu|user=$XSN_RPC_USER|g" $RESOLVERPATH/exchange-a/lnd/xsn/start.bash &>> ${SCRIPT_INTERNAL_LOGFILE}
+  sed -i "s|pass=xu|pass=$XSN_RPC_PASS|g" $RESOLVERPATH/exchange-a/lnd/xsn/start.bash &>> ${SCRIPT_INTERNAL_LOGFILE}
 
-  sed -i "s|user=xu|user=$XSN_RPC_USER|g" $RESOLVERPATH/exchange-b/lnd/xsn/start.bash
-  sed -i "s|pass=xu|pass=$XSN_RPC_PASS|g" $RESOLVERPATH/exchange-b/lnd/xsn/start.bash
+  sed -i "s|user=xu|user=$XSN_RPC_USER|g" $RESOLVERPATH/exchange-b/lnd/xsn/start.bash &>> ${SCRIPT_INTERNAL_LOGFILE}
+  sed -i "s|pass=xu|pass=$XSN_RPC_PASS|g" $RESOLVERPATH/exchange-b/lnd/xsn/start.bash &>> ${SCRIPT_INTERNAL_LOGFILE}
 
   ## Set network XSN
-  sed -i "s|testnet|$NETWORK|g" $RESOLVERPATH/exchange-a/lnd/xsn/start.bash
-  sed -i "s|testnet|$NETWORK|g" $RESOLVERPATH/exchange-b/lnd/xsn/start.bash
+  sed -i "s|testnet|$NETWORK|g" $RESOLVERPATH/exchange-a/lnd/xsn/start.bash &>> ${SCRIPT_INTERNAL_LOGFILE}
+  sed -i "s|testnet|$NETWORK|g" $RESOLVERPATH/exchange-b/lnd/xsn/start.bash &>> ${SCRIPT_INTERNAL_LOGFILE}
 
   ### Set daemon XSN
-  sed -i "s|lnd|$LNDPATH/lnd_xsn|g" $RESOLVERPATH/exchange-a/lnd/xsn/start.bash
-  sed -i "s|lnd|$LNDPATH/lnd_xsn|g" $RESOLVERPATH/exchange-b/lnd/xsn/start.bash
+  sed -i "s|lnd|$LNDPATH/lnd_xsn|g" $RESOLVERPATH/exchange-a/lnd/xsn/start.bash &>> ${SCRIPT_INTERNAL_LOGFILE}
+  sed -i "s|lnd|$LNDPATH/lnd_xsn|g" $RESOLVERPATH/exchange-b/lnd/xsn/start.bash &>> ${SCRIPT_INTERNAL_LOGFILE}
 }
 
 function configureGOPath() {
-    echo -e "export GOPATH=$HOME/go" >> ~/.bashrc
-    echo -e "export PATH=/usr/bin/go/bin:$GOPATH/bin:$PATH" >> ~/.bashrc
-    source ~/.bashrc
+  echo -e "export GOPATH=$HOME/go" >> ~/.bashrc
+  echo -e "export PATH=/usr/bin/go/bin:$GOPATH/bin:$PATH" >> ~/.bashrc
+  source ~/.bashrc
 }
 
 function installDependencies() {
-    echo -ne "Installing dependencies${BLINK}..${OFF}"
-    echo "y" | apt update
-    echo "y" | apt upgrade
-    echo "y" | apt install -y ufw python virtualenv git unzip pv golang-go
-    echo -e \\r"Installing dependencies.."
-    echo -e "$GREENTICK Dependency install done!"
+  echo -ne "Installing dependencies${BLINK}..${OFF}"
+  echo "y" | apt update &>> ${SCRIPT_INTERNAL_LOGFILE}
+  echo "y" | apt upgrade &>> ${SCRIPT_INTERNAL_LOGFILE}
+  echo "y" | apt install -y ufw python virtualenv git unzip pv golang-go &>> ${SCRIPT_INTERNAL_LOGFILE}
+  echo -e \\r"Installing dependencies.."
+  echo -e "$GREENTICK Dependency install done!"
 }
 
 function networkRequest() {
@@ -320,40 +308,40 @@ function networkRequest() {
 
   read -rp "" opt
   case $opt in
-    "1") echo -e "Mainnet Let's do it"
-         NETWORK='mainnet'
-    ;;
-    "2") echo -e "Testnet Let's do it"
-         NETWORK='testnet'
-    ;;
-    *) echo -e "${RED}ERROR:${OFF} Invalid option"
-        exit
-    ;;
+  "1") echo -e "Mainnet Let's do it"
+     NETWORK='mainnet'
+  ;;
+  "2") echo -e "Testnet Let's do it"
+     NETWORK='testnet'
+  ;;
+  *) echo -e "${RED}ERROR:${OFF} Invalid option"
+    exit
+  ;;
    esac
 }
 
 #From https://stackoverflow.com/questions/4686464/how-to-show-wget-progress-bar-only
 function progressfilt ()
 {
-    local flag=false c count cr=$'\r' nl=$'\n'
-    while IFS='' read -d '' -rn 1 c
-    do
-        if $flag
+  local flag=false c count cr=$'\r' nl=$'\n'
+  while IFS='' read -d '' -rn 1 c
+  do
+    if $flag
+    then
+      printf '%c' "$c"
+    else
+      if [[ $c != $cr && $c != $nl ]]
+      then
+        count=0
+      else
+        ((count++))
+        if ((count > 1))
         then
-            printf '%c' "$c"
-        else
-            if [[ $c != $cr && $c != $nl ]]
-            then
-                count=0
-            else
-                ((count++))
-                if ((count > 1))
-                then
-                    flag=true
-                fi
-            fi
+          flag=true
         fi
-    done
+      fi
+    fi
+  done
 }
 
 function checks() {
@@ -363,8 +351,8 @@ function checks() {
   fi
 
   if [[ $EUID -ne 0 ]]; then
-     echo -e "${RED}ERROR:${OFF} Must be run as root (try \"sudo $SCRIPT_NAME\" )"
-     exit 1
+   echo -e "${RED}ERROR:${OFF} Must be run as root (try \"sudo $SCRIPT_NAME\" )"
+   exit 1
   fi
 }
 ################################################################################
@@ -376,6 +364,21 @@ function doLightningNetwork() {
   checkSyncStatus
   startLightningDaemons
   checkSyncStatusLNWallets
+  establishConnection
+  outro
+}
+
+function establishConnection() {
+  echo -e "Establishing connection between exchanges.."
+  sleep 1
+
+  XB_XSN_PUBKEY=`xb-lnd-xsn getinfo|grep identity_pubkey|cut -d '"' -f 4`
+  XB_LTC_PUBKEY=`xb-lnd-ltc getinfo|grep identity_pubkey|cut -d '"' -f 4`
+
+  xa-lnd-xsn connect $XB_XSN_PUBKEY@127.0.0.1:20013 &>> ${SCRIPT_INTERNAL_LOGFILE}
+  xa-lnd-ltc connect $XB_LTC_PUBKEY@127.0.0.1:20011 &>> ${SCRIPT_INTERNAL_LOGFILE}
+
+  echo -e "$GREENTICK Connection establishment successful!"
 }
 
 
@@ -392,63 +395,94 @@ function checkSyncStatusLNWallets()  {
   echo -e "Waiting for all Lightning daemons until they are synced with the wallets.."
 
   xa_xsn=$( (xa-lnd-xsn $SYNCINFO |grep 'synced_to_chain'|awk '{ print $2 }') )
+  xa_xsn_actBlock=$( (xa-lnd-xsn $SYNCINFO |grep 'block_height'|awk '{ print $2 }') )
+
   xb_xsn=$( (xb-lnd-xsn $SYNCINFO |grep 'synced_to_chain'|awk '{ print $2 }') )
+  xb_xsn_actBlock=$( (xb-lnd-xsn $SYNCINFO |grep 'block_height'|awk '{ print $2 }') )
+
   xa_ltc=$( (xa-lnd-ltc $SYNCINFO |grep 'synced_to_chain'|awk '{ print $2 }') )
+  xa_ltc_actBlock=$( (xa-lnd-ltc $SYNCINFO |grep 'block_height'|awk '{ print $2 }') )
+
   xb_ltc=$( (xb-lnd-ltc $SYNCINFO |grep 'synced_to_chain'|awk '{ print $2 }') )
+  xb_ltc_actBlock=$( (xb-lnd-ltc $SYNCINFO |grep 'block_height'|awk '{ print $2 }') )
 
 
   while [[ ${xa_xsn::-1} == "false" ]] || [[ ${xb_xsn::-1} == "false" ]] || [[ ${xa_ltc::-1} == "false" ]] || [[ ${xb_ltc::-1} == "false" ]]
   do
 
-      echo -ne "═══════════════════════════
+    echo -ne "═══════════════════════════
 Synchronisation Time: $(date)
-Waiting for XSN-Lightning Exchange A: Synced to chain: ${xa_xsn::-1}
-Waiting for LTC-Lightning Exchange A: Synced to chain: ${xa_ltc::-1}
-Waiting for XSN-Lightning Exchange B: Synced to chain: ${xb_xsn::-1}
-Waiting for LTC-Lightning Exchange B: Synced to chain: ${xb_ltc::-1}
+Waiting for XSN-Lightning Exchange A: Synced to chain: ${xa_xsn::-1} (Block height: ${xa_xsn_actBlock::-1})
+Waiting for LTC-Lightning Exchange A: Synced to chain: ${xa_ltc::-1} (Block height: ${xa_ltc_actBlock::-1})
+Waiting for XSN-Lightning Exchange B: Synced to chain: ${xb_xsn::-1} (Block height: ${xb_xsn_actBlock::-1})
+Waiting for LTC-Lightning Exchange B: Synced to chain: ${xb_ltc::-1} (Block height: ${xb_ltc_actBlock::-1})
 ═══════════════════════════"\\033[6A\\r
 
-      xa_xsn=$( (xa-lnd-xsn $SYNCINFO |grep 'synced_to_chain'|awk '{ print $2 }') )
-      xb_xsn=$( (xb-lnd-xsn $SYNCINFO |grep 'synced_to_chain'|awk '{ print $2 }') )
-      xa_ltc=$( (xa-lnd-ltc $SYNCINFO |grep 'synced_to_chain'|awk '{ print $2 }') )
-      xb_ltc=$( (xb-lnd-ltc $SYNCINFO |grep 'synced_to_chain'|awk '{ print $2 }') )
+    xa_xsn=$( (xa-lnd-xsn $SYNCINFO |grep 'synced_to_chain'|awk '{ print $2 }') )
+    xa_xsn_actBlock=$( (xa-lnd-xsn $SYNCINFO |grep 'block_height'|awk '{ print $2 }') )
 
-      sleep 1
+    xb_xsn=$( (xb-lnd-xsn $SYNCINFO |grep 'synced_to_chain'|awk '{ print $2 }') )
+    xb_xsn_actBlock=$( (xb-lnd-xsn $SYNCINFO |grep 'block_height'|awk '{ print $2 }') )
+
+    xa_ltc=$( (xa-lnd-ltc $SYNCINFO |grep 'synced_to_chain'|awk '{ print $2 }') )
+    xa_ltc_actBlock=$( (xa-lnd-ltc $SYNCINFO |grep 'block_height'|awk '{ print $2 }') )
+
+    xb_ltc=$( (xb-lnd-ltc $SYNCINFO |grep 'synced_to_chain'|awk '{ print $2 }') )
+    xb_ltc_actBlock=$( (xb-lnd-ltc $SYNCINFO |grep 'block_height'|awk '{ print $2 }') )
+
+    sleep 1
  done
  echo -e "All lightning daemons synced!"
 }
 
 function startLightningDaemons() {
-  echo -e "Starting Lightning Daemons - This can take up to a minute..
-  "
+  echo -e "Starting Lightning Daemons - This can take up to a minute.."
+
   cd $RESOLVERPATH/exchange-a/lnd/xsn/
-  nohup ./start.bash ${SCRIPT_XA_XSN_LOGFILE} &
+  nohup ./start.bash &>> ${SCRIPT_XA_XSN_LOGFILE} &
   echo -e "XSN-Exchange A started.."
   sleep 5
   cd $RESOLVERPATH/exchange-b/lnd/xsn/
-  nohup ./start.bash ${SCRIPT_XB_XSN_LOGFILE} &
+  nohup ./start.bash &>> ${SCRIPT_XB_XSN_LOGFILE} &
   echo -e "XSN-Exchange B started.."
   sleep 5
   cd $RESOLVERPATH/exchange-a/lnd/ltc/
-  nohup ./start.bash ${SCRIPT_XA_LTC_LOGFILE} &
+  nohup ./start.bash &>> ${SCRIPT_XA_LTC_LOGFILE} &
   echo -e "LTC-Exchange A started.."
   sleep 5
   cd $RESOLVERPATH/exchange-b/lnd/ltc/
-  nohup ./start.bash ${SCRIPT_XB_LTC_LOGFILE} &
+  nohup ./start.bash &>> ${SCRIPT_XB_LTC_LOGFILE} &
   echo -e "LTC-Exchange B started.."
 
   cd $RESOLVERPATH/exchange-a/resolver/
-  nohup ./start.bash ltc_xsn ${SCRIPT_XA_RESOLVER_LOGFILE} &
+  nohup ./start.bash ltc_xsn &>> ${SCRIPT_XA_RESOLVER_LOGFILE} &
   echo -e "Resolver-Exchange A started.."
   sleep 5
   cd $RESOLVERPATH/exchange-b/resolver/
-  nohup ./start.bash ltc_xsn ${SCRIPT_XB_RESOLVER_LOGFILE} &
+  nohup ./start.bash ltc_xsn &>> ${SCRIPT_XB_RESOLVER_LOGFILE} &
   echo -e "Resolver-Exchange B started.."
 
   sleep 20
 }
 
 function checkSyncStatus() {
+  xsn_actBlock=$( ($XSN_CONFIGFOLDER/$XSN_CLIENT $BLOCKCHAININFO |grep 'blocks'|awk '{ print $2 }') )
+  xsn_maxBlock=$( ($XSN_CONFIGFOLDER/$XSN_CLIENT $BLOCKCHAININFO |grep 'headers'|awk '{ print $2 }') )
+  xsn_numCon=$( ($XSN_CONFIGFOLDER/$XSN_CLIENT $NETWORKINFO |grep 'connections'|awk '{ print $2 }') )
+
+  ltc_actBlock=$( ($LTC_CONFIGFOLDER/$LTC_CLIENT $BLOCKCHAININFO |grep 'blocks'|awk '{ print $2 }') )
+  ltc_maxBlock=$( ($LTC_CONFIGFOLDER/$LTC_CLIENT $BLOCKCHAININFO |grep 'headers'|awk '{ print $2 }') )
+  ltc_numCon=$( ($LTC_CONFIGFOLDER/$LTC_CLIENT $NETWORKINFO |grep 'connections'|awk '{ print $2 }') )
+
+  while [ ${xsn_maxBlock::-1} -eq 0 ] || [ ${xsn_actBlock::-1} -ne ${xsn_maxBlock::-1} ] || [ ${ltc_maxBlock::-1} -eq 0 ] || [ ${ltc_actBlock::-1} -ne ${ltc_maxBlock::-1} ]
+  do
+
+    echo -ne "═══════════════════════════
+Synchronisation Time: $(date)
+Waiting for XSN sync (${xsn_numCon::-1} Connections): ${xsn_actBlock::-1} / ${xsn_maxBlock::-1} ..
+Waiting for LTC sync (${ltc_numCon::-1} Connections): ${ltc_actBlock::-1} / ${ltc_maxBlock::-1} ..
+═══════════════════════════"\\033[4A\\r
+
     xsn_actBlock=$( ($XSN_CONFIGFOLDER/$XSN_CLIENT $BLOCKCHAININFO |grep 'blocks'|awk '{ print $2 }') )
     xsn_maxBlock=$( ($XSN_CONFIGFOLDER/$XSN_CLIENT $BLOCKCHAININFO |grep 'headers'|awk '{ print $2 }') )
     xsn_numCon=$( ($XSN_CONFIGFOLDER/$XSN_CLIENT $NETWORKINFO |grep 'connections'|awk '{ print $2 }') )
@@ -457,24 +491,7 @@ function checkSyncStatus() {
     ltc_maxBlock=$( ($LTC_CONFIGFOLDER/$LTC_CLIENT $BLOCKCHAININFO |grep 'headers'|awk '{ print $2 }') )
     ltc_numCon=$( ($LTC_CONFIGFOLDER/$LTC_CLIENT $NETWORKINFO |grep 'connections'|awk '{ print $2 }') )
 
-    while [ ${xsn_maxBlock::-1} -eq 0 ] || [ ${xsn_actBlock::-1} -ne ${xsn_maxBlock::-1} ] || [ ${ltc_maxBlock::-1} -eq 0 ] || [ ${ltc_actBlock::-1} -ne ${ltc_maxBlock::-1} ]
-    do
-
-        echo -ne "═══════════════════════════
-Synchronisation Time: $(date)
-Waiting for XSN sync (${xsn_numCon::-1} Connections): ${xsn_actBlock::-1} / ${xsn_maxBlock::-1} ..
-Waiting for LTC sync (${ltc_numCon::-1} Connections): ${ltc_actBlock::-1} / ${ltc_maxBlock::-1} ..
-═══════════════════════════"\\033[4A\\r
-
-        xsn_actBlock=$( ($XSN_CONFIGFOLDER/$XSN_CLIENT $BLOCKCHAININFO |grep 'blocks'|awk '{ print $2 }') )
-        xsn_maxBlock=$( ($XSN_CONFIGFOLDER/$XSN_CLIENT $BLOCKCHAININFO |grep 'headers'|awk '{ print $2 }') )
-        xsn_numCon=$( ($XSN_CONFIGFOLDER/$XSN_CLIENT $NETWORKINFO |grep 'connections'|awk '{ print $2 }') )
-
-        ltc_actBlock=$( ($LTC_CONFIGFOLDER/$LTC_CLIENT $BLOCKCHAININFO |grep 'blocks'|awk '{ print $2 }') )
-        ltc_maxBlock=$( ($LTC_CONFIGFOLDER/$LTC_CLIENT $BLOCKCHAININFO |grep 'headers'|awk '{ print $2 }') )
-        ltc_numCon=$( ($LTC_CONFIGFOLDER/$LTC_CLIENT $NETWORKINFO |grep 'connections'|awk '{ print $2 }') )
-
-        sleep 1
+    sleep 1
    done
    echo -e ""
    echo -e "Wallet synchronisation finished!"
@@ -496,7 +513,7 @@ function printNetworkStatus() {
 function checkIfCoreWalletIsUpStatus() {
   #PARAMS
   # 1:COIN_DAEMON, 2:COIN_NAME, 3:COIN_CONFIGFOLDER, 4:COIN_CLIENT
-  if [[ -z "$(ps axo cmd:100 | egrep $1 | grep ^[^grep])" ]]; then
+  if [[ -z "$(ps axo cmd:100 | egrep "$1" | grep ^[^grep])" ]]; then
     echo -e "${RED}ERROR:${OFF} $2 wallet is not runnning."
   else
     actBlock=$( ($3/$4 $BLOCKCHAININFO |grep 'blocks'|awk '{ print $2 }') )
@@ -509,7 +526,7 @@ function checkIfCoreWalletIsUpStatus() {
 function checkIfLNDWalletIsUpStatus() {
   #PARAMS
   # 1:Tag to Search, 2:alias
-  if [[ -z "$(ps axo cmd:100 | egrep $1 | grep ^[^grep])" ]]; then
+  if [[ -z "$(ps axo cmd:100 | egrep "$1" | grep ^[^grep])" ]]; then
     echo -e "${RED}ERROR:${OFF} $1 daemon is not runnning."
   else
     actBlock=$( ($2 $SYNCINFO |grep 'block_height'|awk '{ print $2 }') )
@@ -522,19 +539,52 @@ function checkIfLNDWalletIsUpStatus() {
 function checkIFResolverAreRunning() {
   #PARAMS
   #1: Tag to Search, 2: Tag to Print
-  if [[ -z "$(ps axo cmd:100 | egrep $1 | grep ^[^grep])" ]]; then
+  if [[ -z "$(ps axo cmd:100 | egrep "$1" | grep ^[^grep])" ]]; then
     echo -e "${RED}ERROR:${OFF} $2 resolver is not runnning."
   else
     echo -e "${GREENTICK} $2 resolver is runnning."
   fi
 }
 
+function outro() {
+  clear
+  showName
+  echo -e "${GREENTICK} Setup finished. Now you can do lightning and atomic swaps!"
+  echo -e ""
+  echo -e ""
+  creatorName
+  echo -e "Donations always accepted gracefully to:"
+  echo -e "XSN: XjS84bRgYd83hikHjhnQWQJJGDueFQEM1m"
+  echo -e "BTC: 16azsAD43MWoBDkfRvdKt6GprdjYSrw2bL"
+}
+
+function creatorName() {
+  echo -e "      ·▄▄▄▄  ▄▄▄ . ▐ ▄        ▐ ▄ "
+  echo -e "      ██▪ ██ ▀▄.▀·•█▌▐█▪     •█▌▐█"
+  echo -e "      ▐█· ▐█▌▐▀▀▪▄▐█▐▐▌ ▄█▀▄ ▐█▐▐▌"
+  echo -e "      ██. ██ ▐█▄▄▌██▐█▌▐█▌.▐▌██▐█▌"
+  echo -e "      ▀▀▀▀▀•  ▀▀▀ ▀▀ █▪ ▀█▄▀▪▀▀ █▪"
+}
+
+
+function showName() {
+  echo -e "███████╗████████╗ █████╗ ██╗  ██╗███████╗███╗   ██╗███████╗████████╗"
+  echo -e "██╔════╝╚══██╔══╝██╔══██╗██║ ██╔╝██╔════╝████╗  ██║██╔════╝╚══██╔══╝"
+  echo -e "███████╗   ██║   ███████║█████╔╝ █████╗  ██╔██╗ ██║█████╗     ██║   "
+  echo -e "╚════██║   ██║   ██╔══██║██╔═██╗ ██╔══╝  ██║╚██╗██║██╔══╝     ██║   "
+  echo -e "███████║   ██║   ██║  ██║██║  ██╗███████╗██║ ╚████║███████╗   ██║   "
+  echo -e "╚══════╝   ╚═╝   ╚═╝  ╚═╝╚═╝  ╚═╝╚══════╝╚═╝  ╚═══╝╚══════╝   ╚═╝   "
+}
+
+
 function menu() {
   mkdir $SCRIPT_LOGFOLDER
-  #clear
+  clear
+  showName
   checks
 
-  echo -e "Lightning & Atomic Swaps script $SCRIPTVER (from Denon)"
+  echo -e "Lightning and atomic swaps script $SCRIPTVER (from Denon)"
+  echo -e "Log files can be found in $SCRIPT_LOGFOLDER"
   echo -e "════════════════════════════"
   echo -e "══════════ Menu ════════════"
   echo -e "════════════════════════════"
@@ -549,19 +599,19 @@ function menu() {
   #PS3="Ihre Wahl : "
   read -rp "Please select your choice: " opt
   case $opt in
-    "1") echo -e "Install full setup.."
-         doFullSetup
-    ;;
-    "2") echo -e "Starting lightning network.."
-        doLightningNetwork
-    ;;
-    "3") echo -e "Checking network status.."
-        printNetworkStatus
-    ;;
-    "4") exit
-    ;;
+  "1") echo -e "Install full setup.."
+     doFullSetup
+  ;;
+  "2") echo -e "Starting lightning network.."
+    doLightningNetwork
+  ;;
+  "3") echo -e "Checking network status.."
+    printNetworkStatus
+  ;;
+  "4") exit
+  ;;
 
-    *) echo -e "${RED}ERROR:${OFF} Invalid option";;
+  *) echo -e "${RED}ERROR:${OFF} Invalid option";;
    esac
 }
 
