@@ -389,14 +389,15 @@ function checkIfCoreWalletIsUp() {
 }
 
 function checkSyncStatusLNWallets()  {
+  echo -e "Waiting for all Lightning daemons until they are synced with the wallets.."
+
   xa_xsn=$( (xa-lnd-xsn $SYNCINFO |grep 'synced_to_chain'|awk '{ print $2 }') )
   xb_xsn=$( (xb-lnd-xsn $SYNCINFO |grep 'synced_to_chain'|awk '{ print $2 }') )
   xa_ltc=$( (xa-lnd-ltc $SYNCINFO |grep 'synced_to_chain'|awk '{ print $2 }') )
   xb_ltc=$( (xb-lnd-ltc $SYNCINFO |grep 'synced_to_chain'|awk '{ print $2 }') )
 
-    echo -e "Test: ${xb_xsn%,}"
 
-  while [[ ${xa_xsn%,} == "false" ]] || [[ ${xb_xsn%,} == "false" ]] || [[ ${xa_ltc%,} == "false" ]] || [[ ${xb_ltc%,} == "false" ]]
+  while [[ ${xa_xsn::-1} == "false" ]] || [[ ${xb_xsn::-1} == "false" ]] || [[ ${xa_ltc::-1} == "false" ]] || [[ ${xb_ltc::-1} == "false" ]]
   do
 
       echo -ne "═══════════════════════════
@@ -418,22 +419,33 @@ Waiting for LTC-Lightning Exchange B: Synced to chain: ${xb_ltc::-1}
 }
 
 function startLightningDaemons() {
+  echo -e "Starting Lightning Daemons - This can take up to a minute..
+  "
   cd $RESOLVERPATH/exchange-a/lnd/xsn/
-  nohup ./start.bash 2>/dev/null 1>/dev/null & #${SCRIPT_XA_XSN_LOGFILE} &
+  nohup ./start.bash ${SCRIPT_XA_XSN_LOGFILE} &
+  echo -e "XSN-Exchange A started.."
+  sleep 5
   cd $RESOLVERPATH/exchange-b/lnd/xsn/
-  nohup ./start.bash 2>/dev/null 1>/dev/null & # ${SCRIPT_XB_XSN_LOGFILE} &
-
+  nohup ./start.bash ${SCRIPT_XB_XSN_LOGFILE} &
+  echo -e "XSN-Exchange B started.."
+  sleep 5
   cd $RESOLVERPATH/exchange-a/lnd/ltc/
-  nohup ./start.bash 2>/dev/null 1>/dev/null & # ${SCRIPT_XA_LTC_LOGFILE} &
+  nohup ./start.bash ${SCRIPT_XA_LTC_LOGFILE} &
+  echo -e "LTC-Exchange A started.."
+  sleep 5
   cd $RESOLVERPATH/exchange-b/lnd/ltc/
-  nohup ./start.bash 2>/dev/null 1>/dev/null & # ${SCRIPT_XB_LTC_LOGFILE} &
+  nohup ./start.bash ${SCRIPT_XB_LTC_LOGFILE} &
+  echo -e "LTC-Exchange B started.."
 
   cd $RESOLVERPATH/exchange-a/resolver/
-  nohup ./start.bash ltc_xsn 2>/dev/null 1>/dev/null & # ${SCRIPT_XA_RESOLVER_LOGFILE} &
-  cd $RESOLVERPATH/exchange-b/resolver/
-  nohup ./start.bash ltc_xsn 2>/dev/null 1>/dev/null & # ${SCRIPT_XB_RESOLVER_LOGFILE} &
-
+  nohup ./start.bash ltc_xsn ${SCRIPT_XA_RESOLVER_LOGFILE} &
+  echo -e "Resolver-Exchange A started.."
   sleep 5
+  cd $RESOLVERPATH/exchange-b/resolver/
+  nohup ./start.bash ltc_xsn ${SCRIPT_XB_RESOLVER_LOGFILE} &
+  echo -e "Resolver-Exchange B started.."
+
+  sleep 20
 }
 
 function checkSyncStatus() {
@@ -465,12 +477,57 @@ Waiting for LTC sync (${ltc_numCon::-1} Connections): ${ltc_actBlock::-1} / ${lt
         sleep 1
    done
    echo -e ""
-   echo -e "Sync finished!"
-   echo -e "XSN: ${xsn_actBlock::-1} / ${xsn_maxBlock::-1}"
-   echo -e "LTC: ${ltc_actBlock::-1} / ${ltc_maxBlock::-1}"
+   echo -e "Wallet synchronisation finished!"
 }
 
+function printNetworkStatus() {
+  checkIfCoreWalletIsUpStatus $XSN_DAEMON $XSN_CODE_NAME $XSN_CONFIGFOLDER $XSN_CLIENT
+  checkIfCoreWalletIsUpStatus $LTC_DAEMON $LTC_CODE_NAME $LTC_CONFIGFOLDER $LTC_CLIENT
 
+  checkIfLNDWalletIsUpStatus "Exchange A XSN" xa-lnd-xsn
+  checkIfLNDWalletIsUpStatus "Exchange B XSN" xb-lnd-xsn
+  checkIfLNDWalletIsUpStatus "Exchange A LTC" xa-lnd-ltc
+  checkIfLNDWalletIsUpStatus "Exchange B LTC" xb-lnd-ltc
+
+  checkIFResolverAreRunning "xsn localhost:10003" "Exchange A"
+  checkIFResolverAreRunning "xsn localhost:20003" "Exchange B"
+}
+
+function checkIfCoreWalletIsUpStatus() {
+  #PARAMS
+  # 1:COIN_DAEMON, 2:COIN_NAME, 3:COIN_CONFIGFOLDER, 4:COIN_CLIENT
+  if [[ -z "$(ps axo cmd:100 | egrep $1 | grep ^[^grep])" ]]; then
+    echo -e "${RED}ERROR:${OFF} $2 wallet is not runnning."
+  else
+    actBlock=$( ($3/$4 $BLOCKCHAININFO |grep 'blocks'|awk '{ print $2 }') )
+    maxBlock=$( ($3/$4 $BLOCKCHAININFO |grep 'headers'|awk '{ print $2 }') )
+
+    echo -e "${GREENTICK} $2 wallet is runnning - ${actBlock::-1} / ${maxBlock::-1}"
+  fi
+}
+
+function checkIfLNDWalletIsUpStatus() {
+  #PARAMS
+  # 1:Tag to Search, 2:alias
+  if [[ -z "$(ps axo cmd:100 | egrep $1 | grep ^[^grep])" ]]; then
+    echo -e "${RED}ERROR:${OFF} $1 daemon is not runnning."
+  else
+    actBlock=$( ($2 $SYNCINFO |grep 'block_height'|awk '{ print $2 }') )
+    isSynced=$( ($2 $SYNCINFO |grep 'synced_to_chain'|awk '{ print $2 }') )
+
+    echo -e "${GREENTICK} $1 daemon is runnning - Actual block: ${actBlock::-1} - Synced to chain: ${isSynced::-1}"
+  fi
+}
+
+function checkIFResolverAreRunning() {
+  #PARAMS
+  #1: Tag to Search, 2: Tag to Print
+  if [[ -z "$(ps axo cmd:100 | egrep $1 | grep ^[^grep])" ]]; then
+    echo -e "${RED}ERROR:${OFF} $2 resolver is not runnning."
+  else
+    echo -e "${GREENTICK} $2 resolver is runnning."
+  fi
+}
 
 function menu() {
   mkdir $SCRIPT_LOGFOLDER
@@ -485,7 +542,8 @@ function menu() {
   echo -e "════════════════════════════"
   echo -e "1: Install full setup"
   echo -e "2: Start lightning network"
-  echo -e "3: Exit"
+  echo -e "3: Check network status"
+  echo -e "4: Exit"
   echo -e "════════════════════════════"
 
   #PS3="Ihre Wahl : "
@@ -495,10 +553,12 @@ function menu() {
          doFullSetup
     ;;
     "2") echo -e "Starting lightning network.."
-        #startLightningDaemons
         doLightningNetwork
     ;;
-    "3") exit
+    "3") echo -e "Checking network status.."
+        printNetworkStatus
+    ;;
+    "4") exit
     ;;
 
     *) echo -e "${RED}ERROR:${OFF} Invalid option";;
