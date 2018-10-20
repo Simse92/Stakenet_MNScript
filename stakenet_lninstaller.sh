@@ -111,8 +111,8 @@ function doFullSetup() {
 function deleteOldInstallation() {
 
   ps aux | grep -ie lnd | awk '{print $2}' | xargs kill -9 &>> ${SCRIPT_INTERNAL_LOGFILE}
-  stopDaemon $XSN_DAEMON $XSN_CONFIGFOLDER $XSN_CLIENT
-  stopDaemon $LTC_DAEMON $LTC_CONFIGFOLDER $LTC_CLIENT
+  stopDaemon $XSN_DAEMON $XSN_CONFIGFOLDER $XSN_CLIENT &>> ${SCRIPT_INTERNAL_LOGFILE}
+  stopDaemon $LTC_DAEMON $LTC_CONFIGFOLDER $LTC_CLIENT &>> ${SCRIPT_INTERNAL_LOGFILE}
 
   rm -r $XSN_CONFIGFOLDER &>> ${SCRIPT_INTERNAL_LOGFILE}
   rm -r $LTC_CONFIGFOLDER &>> ${SCRIPT_INTERNAL_LOGFILE}
@@ -150,16 +150,15 @@ function startGenWallet() {
   # WaitOnServerStart
   waitWallet="-1"
   retryCounter=0
-  echo -ne "Waiting on $1 wallet${BLINK}..${OFF}"
+  echo -e "Waiting on $1 wallet${BLINK}..${OFF}"
   while [[ $waitWallet -ne "0" && $retryCounter -lt $WALLET_TIMEOUT_S ]]
   do
     sleep 1
-    $2/$4 $BLOCKCHAININFO
+    $2/$4 $BLOCKCHAININFO &>> ${SCRIPT_INTERNAL_LOGFILE}
     waitWallet="$?"
     retryCounter=$[retryCounter+1]
   done
 
-  echo -e \\r"Waiting on wallet.."
   if [[ $retryCounter -ge $WALLET_TIMEOUT_S ]]; then
     echo -e "${RED}ERROR:${OFF}"
     printErrorLog
@@ -234,6 +233,7 @@ function installGenWallet() {
 }
 
 function installANDconfigureLNDDeamons() {
+  echo -e "Downloading and installing Lightning daemons${BLINK}..${OFF}"
   mkdir $LNDPATH &>> ${SCRIPT_INTERNAL_LOGFILE}
   wget $LNDGIT/lncli -P $LNDPATH &>> ${SCRIPT_INTERNAL_LOGFILE}
   wget $LNDGIT/lnd -P $LNDPATH &>> ${SCRIPT_INTERNAL_LOGFILE}
@@ -249,10 +249,12 @@ function installANDconfigureLNDDeamons() {
 
 
   chmod 777 /usr/local/bin/x* &>> ${SCRIPT_INTERNAL_LOGFILE}
+
+  echo -e "$GREENTICK Lightning daemon installation done!"
 }
 
 function installANDconfigureSwapResolver() {
-  echo -e "Installing Swap-Resolver.."
+  echo -e "Installing Swap-Resolver${BLINK}..${OFF}"
   git clone https://github.com/X9Developers/swap-resolver.git $GOPATH/src/github.com/ExchangeUnion/swap-resolver &>> ${SCRIPT_INTERNAL_LOGFILE}
 
   # Set rpcUserPass LTC
@@ -284,6 +286,8 @@ function installANDconfigureSwapResolver() {
   ### Set daemon XSN
   sed -i "s|lnd|$LNDPATH/lnd_xsn|g" $RESOLVERPATH/exchange-a/lnd/xsn/start.bash &>> ${SCRIPT_INTERNAL_LOGFILE}
   sed -i "s|lnd|$LNDPATH/lnd_xsn|g" $RESOLVERPATH/exchange-b/lnd/xsn/start.bash &>> ${SCRIPT_INTERNAL_LOGFILE}
+
+  echo -e "$GREENTICK Swap-Resolver installation done!"
 }
 
 function configureGOPath() {
@@ -432,7 +436,7 @@ Waiting for LTC-Lightning Exchange B: Synced to chain: ${xb_ltc::-1} (Block heig
 
     sleep 1
  done
- echo -e "All lightning daemons synced!"
+ echo -e "$GREENTICK All lightning daemons synced!"
 }
 
 function startLightningDaemons() {
@@ -466,6 +470,8 @@ function startLightningDaemons() {
 }
 
 function checkSyncStatus() {
+ echo -e "Waiting until all core wallets are synchronized!"
+
   xsn_actBlock=$( ($XSN_CONFIGFOLDER/$XSN_CLIENT $BLOCKCHAININFO |grep 'blocks'|awk '{ print $2 }') )
   xsn_maxBlock=$( ($XSN_CONFIGFOLDER/$XSN_CLIENT $BLOCKCHAININFO |grep 'headers'|awk '{ print $2 }') )
   xsn_numCon=$( ($XSN_CONFIGFOLDER/$XSN_CLIENT $NETWORKINFO |grep 'connections'|awk '{ print $2 }') )
@@ -494,7 +500,7 @@ Waiting for LTC sync (${ltc_numCon::-1} Connections): ${ltc_actBlock::-1} / ${lt
     sleep 1
    done
    echo -e ""
-   echo -e "Wallet synchronisation finished!"
+   echo -e "$GREENTICK Wallet synchronisation finished!"
 }
 
 function printNetworkStatus() {
@@ -578,8 +584,10 @@ function showName() {
 
 
 function menu() {
-  mkdir $SCRIPT_LOGFOLDER
-  clear
+  if [[ ! -d $( eval echo "$SCRIPT_LOGFOLDER" ) ]]; then
+    mkdir $( eval echo $SCRIPT_LOGFOLDER )
+  fi
+  #clear
   showName
   checks
 
