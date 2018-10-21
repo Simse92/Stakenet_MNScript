@@ -466,7 +466,9 @@ function startLightningDaemons() {
   nohup ./start.bash ltc_xsn &>> ${SCRIPT_XB_RESOLVER_LOGFILE} &
   echo -e "Resolver-Exchange B started.."
 
-  sleep 20
+
+  echo -e "Wait 60 seconds..Until all daemons are started."
+  sleep 60
 }
 
 function checkSyncStatus() {
