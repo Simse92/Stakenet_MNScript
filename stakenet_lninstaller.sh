@@ -299,7 +299,7 @@ function configureGOPath() {
 function installDependencies() {
   echo -ne "Installing dependencies${BLINK}..${OFF}"
   echo "y" | apt update &>> ${SCRIPT_INTERNAL_LOGFILE}
-  echo "y" | apt upgrade &>> ${SCRIPT_INTERNAL_LOGFILE}
+  #echo "y" | apt upgrade &>> ${SCRIPT_INTERNAL_LOGFILE}
   echo "y" | apt install -y ufw python virtualenv git unzip pv golang-go &>> ${SCRIPT_INTERNAL_LOGFILE}
   echo -e \\r"Installing dependencies.."
   echo -e "$GREENTICK Dependency install done!"

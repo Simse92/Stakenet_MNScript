@@ -148,7 +148,7 @@ function recoverBackup() {
 function installDependencies() {
     echo -ne "Installing dependencies${BLINK}..${OFF}"
     echo "y" | apt update > /dev/null 2>&1
-    echo "y" | apt upgrade > /dev/null 2>&1
+    #echo "y" | apt upgrade > /dev/null 2>&1
     echo "y" | apt install -y ufw python virtualenv git unzip pv > /dev/null 2>&1
     echo -e \\r"Installing dependencies.."
     echo -e "$GREENTICK Dependency install done!"
@@ -453,7 +453,7 @@ function addBootstrap() {
 
 function checks() {
   if [[ $( lsb_release -d ) != *16.04* ]] && [[ $( lsb_release -d ) != *18.04* ]]; then
-    echo -e "${RED}ERROR:${OFF} You are not running Ubuntu 16.04. Installation is cancelled."
+    echo -e "${RED}ERROR:${OFF} You are not running Ubuntu 16.04 or 18.04. Installation is cancelled."
     exit 1
   fi
 
