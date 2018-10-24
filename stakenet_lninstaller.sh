@@ -2,7 +2,7 @@
 SCRIPTVER=1.0.1
 
 WALLET_TIMEOUT_S=60
-NETWORK='testnet'
+NETWORK=''
 
 #logging
 DATE_STAMP="$(date +%y-%m-%d-%s)"
@@ -34,7 +34,11 @@ LTC_ZMQ_TX_PORT='28333'
 XSN_CODE_NAME='XSN'
 XSN_DAEMON='xsnd'
 XSN_CLIENT='xsn-cli'
-XSN_COIN_GIT='https://github.com/X9Developers/lnd/raw/master/wallets/xsn-1.0.16-x86_64-linux-gnu.tar.gz'
+XSN_COIN_GIT=''
+#testnet
+XSN_COIN_GIT_TESTNET='https://github.com/X9Developers/lnd/raw/master/wallets/xsn-1.0.16-x86_64-linux-gnu.tar.gz'
+#mainnet
+XSN_COIN_GIT_MAINNET='https://github.com/X9Developers/XSN/releases/download/v1.0.16/xsn-1.0.16-x86_64-linux-gnu.tar.gz'
 XSN_FILE_NAME_TAR='xsn-1.0.16-x86_64-linux-gnu.tar.gz'
 XSN_FILE_NAME='xsn-1.0.16'
 XSN_CONFIGFOLDER="$HOME/.xsncore"
@@ -68,7 +72,7 @@ OFF='\E[0m'
 function doFullSetup() {
   clear
   deleteOldInstallation
-  #networkRequest
+  networkRequest
   installDependencies
   configureGOPath
 
@@ -236,7 +240,7 @@ function installANDconfigureLNDDeamons() {
   echo -e "Downloading and installing Lightning daemons${BLINK}..${OFF}"
   mkdir $LNDPATH &>> ${SCRIPT_INTERNAL_LOGFILE}
   wget $LNDGIT/lncli -P $LNDPATH &>> ${SCRIPT_INTERNAL_LOGFILE}
-  wget $LNDGIT/lnd -P $LNDPATH &>> ${SCRIPT_INTERNAL_LOGFILE}
+  wget $LNDGIT/lnd_ltc -P $LNDPATH &>> ${SCRIPT_INTERNAL_LOGFILE}
   wget $LNDGIT/lnd_xsn -P $LNDPATH &>> ${SCRIPT_INTERNAL_LOGFILE}
 
   chmod 777 $LNDPATH/ln* &>> ${SCRIPT_INTERNAL_LOGFILE}
@@ -269,8 +273,8 @@ function installANDconfigureSwapResolver() {
   sed -i "s|testnet|$NETWORK|g" $RESOLVERPATH/exchange-b/lnd/ltc/start.bash &>> ${SCRIPT_INTERNAL_LOGFILE}
 
   ### Set daemon LTC
-  sed -i "s|lnd|$LNDPATH/lnd|g" $RESOLVERPATH/exchange-a/lnd/ltc/start.bash &>> ${SCRIPT_INTERNAL_LOGFILE}
-  sed -i "s|lnd|$LNDPATH/lnd|g" $RESOLVERPATH/exchange-b/lnd/ltc/start.bash &>> ${SCRIPT_INTERNAL_LOGFILE}
+  sed -i "s|lnd|$LNDPATH/lnd_ltc|g" $RESOLVERPATH/exchange-a/lnd/ltc/start.bash &>> ${SCRIPT_INTERNAL_LOGFILE}
+  sed -i "s|lnd|$LNDPATH/lnd_ltc|g" $RESOLVERPATH/exchange-b/lnd/ltc/start.bash &>> ${SCRIPT_INTERNAL_LOGFILE}
 
   # Set rpcUserPass XSN
   sed -i "s|user=xu|user=$XSN_RPC_USER|g" $RESOLVERPATH/exchange-a/lnd/xsn/start.bash &>> ${SCRIPT_INTERNAL_LOGFILE}
@@ -314,9 +318,11 @@ function networkRequest() {
   case $opt in
   "1") echo -e "Mainnet Let's do it"
      NETWORK='mainnet'
+     XSN_COIN_GIT=$XSN_COIN_GIT_MAINNET
   ;;
   "2") echo -e "Testnet Let's do it"
      NETWORK='testnet'
+     XSN_COIN_GIT=$XSN_COIN_GIT_TESTNET
   ;;
   *) echo -e "${RED}ERROR:${OFF} Invalid option"
     exit
