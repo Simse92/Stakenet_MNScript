@@ -75,6 +75,7 @@ function doFullSetup() {
   networkRequest
   installDependencies
   configureGOPath
+  memorycheck
 
   installGenWallet $LTC_CODE_NAME $LTC_FILE_NAME_TAR $LTC_FILE_NAME $LTC_CONFIGFOLDER $LTC_COIN_GIT $LTC_DAEMON $LTC_CLIENT
   createGenConfig $LTC_CODE_NAME $LTC_CONFIGFOLDER $LTC_CONFIG_FILE $LTC_ZMQ_BLOCK_PORT $LTC_ZMQ_TX_PORT
@@ -130,6 +131,32 @@ function deleteOldInstallation() {
   rm /usr/local/bin/xb-lnd-xsn &>> ${SCRIPT_INTERNAL_LOGFILE}
   rm /usr/local/bin/xa-lnd-ltc &>> ${SCRIPT_INTERNAL_LOGFILE}
   rm /usr/local/bin/xb-lnd-ltc &>> ${SCRIPT_INTERNAL_LOGFILE}
+}
+
+function memorycheck() {
+
+  echo -e "Checking Memory.."
+  FREEMEM=$( free -m |sed -n '2,2p' |awk '{ print $4 }' )
+  SWAPS=$( free -m |tail -n1 |awk '{ print $2 }' )
+
+  if [[ $FREEMEM -lt 2048 ]]; then
+    if [[ $SWAPS -eq 0 ]]; then
+      echo -e "Adding swap.."
+      fallocate -l 4G /swapfile
+  		chmod 600 /swapfile
+  		mkswap /swapfile
+  		swapon /swapfile
+  		cp /etc/fstab /etc/fstab.bak
+  		echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
+
+      echo -e "$GREENTICK Added 4G Swapfile!"
+    else
+      echo -e "$GREENTICK Swapsize: $SWAPS, thats enough!"
+    fi
+  else
+    echo -e "$GREENTICK Freemem: $FREEMEN, thats enough free RAM!"
+  fi
+
 }
 
 function stopDaemon() {
