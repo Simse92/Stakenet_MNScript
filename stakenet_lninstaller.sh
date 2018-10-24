@@ -138,7 +138,7 @@ function memorycheck() {
   echo -e "Checking Memory.."
   TOTAL_MEM=$( free -m |sed -n '2,2p' |awk '{ print $2 }' )
   SWAP=$( free -m |tail -n1 |awk '{ print $2 }' )
-  DESIRED_SWAP=$(( $TOTAL_MEM*2 ))
+  DESIRED_SWAP=4000
 
   echo -e "Total Memory: $TOTAL_MEM, Current Swap: $SWAP, Desired Swap: $DESIRED_SWAP"
 
