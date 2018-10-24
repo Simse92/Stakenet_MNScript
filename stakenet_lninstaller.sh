@@ -136,28 +136,28 @@ function deleteOldInstallation() {
 function memorycheck() {
 
   echo -e "Checking Memory.."
-  FREEMEM=$( free -m |sed -n '2,2p' |awk '{ print $4 }' )
-  SWAPS=$( free -m |tail -n1 |awk '{ print $2 }' )
+  TOTAL_MEM=$( free -m |sed -n '2,2p' |awk '{ print $2 }' )
+  SWAP=$( free -m |tail -n1 |awk '{ print $2 }' )
+  DESIRED_SWAP=$(( $TOTAL_MEM*2 ))
 
-  if [[ $FREEMEM -lt 2048 ]]; then
-    if [[ $SWAPS -eq 0 ]]; then
-      echo -e "Adding swap.."
-      fallocate -l 4G /swapfile
-  		chmod 600 /swapfile
-  		mkswap /swapfile
-  		swapon /swapfile
-  		cp /etc/fstab /etc/fstab.bak
-  		echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
+  echo -e "Total Memory: $TOTAL_MEM, Current Swap: $SWAP, Desired Swap: $DESIRED_SWAP"
 
-      echo -e "$GREENTICK Added 4G Swapfile!"
-    else
-      echo -e "$GREENTICK Swapsize: $SWAPS, thats enough!"
-    fi
+  if [[ $SWAP -lt $DESIRED_SWAP ]]; then
+    echo -e "Adding $DESIRED_SWAP swap.."
+    fallocate -l $DESIRED_SWAP /swapfile
+    chmod 600 /swapfile
+    mkswap /swapfile
+    swapon /swapfile
+    cp /etc/fstab /etc/fstab.bak
+    echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
+
+    echo -e "$GREENTICK Added $DESIRED_SWAP Swapfile!"
   else
-    echo -e "$GREENTICK Freemem: $FREEMEN, thats enough free RAM!"
+    echo -e "$GREENTICK Swapsize: $SWAP, thats enough!"
   fi
 
 }
+
 
 function stopDaemon() {
   #PARAMS
