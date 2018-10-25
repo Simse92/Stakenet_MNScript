@@ -400,8 +400,7 @@ function doLightningNetwork() {
   checkIfCoreWalletIsUp $LTC_DAEMON $LTC_CODE_NAME
   checkSyncStatus
   startLightningDaemons
-  checkSyncStatusLNWallets
-  establishConnection
+  #establishConnection
   outro
 }
 
@@ -539,6 +538,8 @@ Waiting for LTC sync (${ltc_numCon::-1} Connections): ${ltc_actBlock::-1} / ${lt
 }
 
 function printNetworkStatus() {
+  checkSyncStatusLNWallets
+
   checkIfCoreWalletIsUpStatus $XSN_DAEMON $XSN_CODE_NAME $XSN_CONFIGFOLDER $XSN_CLIENT
   checkIfCoreWalletIsUpStatus $LTC_DAEMON $LTC_CODE_NAME $LTC_CONFIGFOLDER $LTC_CLIENT
 
@@ -590,7 +591,8 @@ function checkIFResolverAreRunning() {
 function outro() {
   clear
   showName
-  echo -e "${GREENTICK} Setup finished. Now you can do lightning and atomic swaps!"
+  echo -e "${GREENTICK} Setup finished. Now you have to wait until the chains are synced. Then you can do lightning and atomic swaps!"
+  echo -e "To now exactly when it is finished, start this script again and choose \"Check sync and network status..\""
   echo -e ""
   echo -e ""
   creatorName
@@ -645,10 +647,10 @@ function menu() {
   "1") echo -e "Install full setup.."
      doFullSetup
   ;;
-  "2") echo -e "Starting lightning network.."
+  "2") echo -e "Start lightning network.."
     doLightningNetwork
   ;;
-  "3") echo -e "Checking network status.."
+  "3") echo -e "Check sync and network status.."
     printNetworkStatus
   ;;
   "4") exit
