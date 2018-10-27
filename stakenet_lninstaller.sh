@@ -3,6 +3,7 @@ SCRIPTVER=1.0.1
 
 WALLET_TIMEOUT_S=60
 NETWORK=''
+EXCHANGE=''
 
 #logging
 DATE_STAMP="$(date +%y-%m-%d-%s)"
@@ -74,6 +75,7 @@ function doFullSetup() {
   deleteOldInstallation
   networkRequest
   installDependencies
+  enable_firewall
   configureGOPath
   memorycheck
 
@@ -300,6 +302,10 @@ function installANDconfigureSwapResolver() {
   sed -i "s|testnet|$NETWORK|g" $RESOLVERPATH/exchange-b/lnd/ltc/start.bash &>> ${SCRIPT_INTERNAL_LOGFILE}
 
   ### Set daemon LTC
+  sed -i "s|localhost:10011|0.0.0.0:10011|g" $RESOLVERPATH/exchange-a/lnd/ltc/start.bash &>> ${SCRIPT_INTERNAL_LOGFILE}
+  sed -i "s|localhost:20011|0.0.0.0:20011|g" $RESOLVERPATH/exchange-b/lnd/ltc/start.bash &>> ${SCRIPT_INTERNAL_LOGFILE}
+
+  ### Set liste to all interfaces
   sed -i "s|lnd|$LNDPATH/lnd_ltc|g" $RESOLVERPATH/exchange-a/lnd/ltc/start.bash &>> ${SCRIPT_INTERNAL_LOGFILE}
   sed -i "s|lnd|$LNDPATH/lnd_ltc|g" $RESOLVERPATH/exchange-b/lnd/ltc/start.bash &>> ${SCRIPT_INTERNAL_LOGFILE}
 
@@ -318,6 +324,14 @@ function installANDconfigureSwapResolver() {
   sed -i "s|lnd|$LNDPATH/lnd_xsn|g" $RESOLVERPATH/exchange-a/lnd/xsn/start.bash &>> ${SCRIPT_INTERNAL_LOGFILE}
   sed -i "s|lnd|$LNDPATH/lnd_xsn|g" $RESOLVERPATH/exchange-b/lnd/xsn/start.bash &>> ${SCRIPT_INTERNAL_LOGFILE}
 
+  ### Set daemon LTC
+  sed -i "s|localhost:10013|0.0.0.0:10013|g" $RESOLVERPATH/exchange-a/lnd/xsn/start.bash &>> ${SCRIPT_INTERNAL_LOGFILE}
+  sed -i "s|localhost:20013|0.0.0.0:20013|g" $RESOLVERPATH/exchange-b/lnd/xsn/start.bash &>> ${SCRIPT_INTERNAL_LOGFILE}
+
+  #### Set Resolver
+  sed -i "s|localhost:7001|0.0.0.0:7001|g" $RESOLVERPATH/exchange-a/resolver/start.bash &>> ${SCRIPT_INTERNAL_LOGFILE}
+  sed -i "s|localhost:7002|0.0.0.0:7002|g" $RESOLVERPATH/exchange-b/resolver/start.bash &>> ${SCRIPT_INTERNAL_LOGFILE}
+
   echo -e "$GREENTICK Swap-Resolver installation done!"
 }
 
@@ -334,6 +348,16 @@ function installDependencies() {
   echo "y" | apt install -y ufw python virtualenv git unzip pv golang-go &>> ${SCRIPT_INTERNAL_LOGFILE}
   echo -e \\r"Installing dependencies.."
   echo -e "$GREENTICK Dependency install done!"
+}
+
+function enable_firewall() {
+  echo -e "Setting up firewall to allow traffic on port $COIN_PORT.."
+  ufw allow ssh/tcp >/dev/null 2>&1
+  ufw limit ssh/tcp >/dev/null 2>&1
+  ufw allow $COIN_PORT/tcp >/dev/null 2>&1
+  ufw logging on >/dev/null 2>&1
+  echo "y" | ufw enable >/dev/null 2>&1
+  echo -e "$GREENTICK Firewall setup done!"
 }
 
 function networkRequest() {
@@ -402,6 +426,90 @@ function doLightningNetwork() {
   startLightningDaemons
   #establishConnection
   outro
+}
+
+function doLightningNetworkWithPartner {
+  whichExchange
+  configureExchange
+  checkIfCoreWalletIsUp $XSN_DAEMON $XSN_CODE_NAME
+  checkIfCoreWalletIsUp $LTC_DAEMON $LTC_CODE_NAME
+  checkSyncStatus
+
+  startOwnExchange
+
+}
+
+function startOwnExchange() {
+  echo -e "Starting Lightning Daemons - This can take up to a minute.."
+
+  if [ "$EXCHANGE" == "A" ]; then
+    cd $RESOLVERPATH/exchange-a/lnd/xsn/
+    nohup ./start.bash &>> ${SCRIPT_XA_XSN_LOGFILE} &
+    echo -e "XSN-Exchange A started.."
+    sleep 5
+    cd $RESOLVERPATH/exchange-a/lnd/ltc/
+    nohup ./start.bash &>> ${SCRIPT_XA_LTC_LOGFILE} &
+    echo -e "LTC-Exchange A started.."
+    sleep 5
+    cd $RESOLVERPATH/exchange-a/resolver/
+    nohup ./start.bash ltc_xsn &>> ${SCRIPT_XA_RESOLVER_LOGFILE} &
+    echo -e "Resolver-Exchange A started.."
+  fi
+
+  if [ "$EXCHANGE" == "B" ]; then
+    cd $RESOLVERPATH/exchange-b/lnd/xsn/
+    nohup ./start.bash &>> ${SCRIPT_XB_XSN_LOGFILE} &
+    echo -e "XSN-Exchange B started.."
+    sleep 5
+    cd $RESOLVERPATH/exchange-b/lnd/ltc/
+    nohup ./start.bash &>> ${SCRIPT_XB_LTC_LOGFILE} &
+    echo -e "LTC-Exchange B started.."
+    sleep 5
+    cd $RESOLVERPATH/exchange-b/resolver/
+    nohup ./start.bash ltc_xsn &>> ${SCRIPT_XB_RESOLVER_LOGFILE} &
+    echo -e "Resolver-Exchange B started.."
+  fi
+
+  echo -e "Wait 60 seconds..Until all daemons are started."
+  sleep 60
+}
+
+function configureExchange() {
+  echo -e "We need the IPv4 address from your Partner."
+  read -rp "Use the following scheme XXX.XXX.XXX.XXX: " VPSIP
+
+  if [ "$EXCHANGE" == "A" ]; then
+    sed -i "s|localhost:7002|$VPSIP:7002|g" $RESOLVERPATH/exchange-a/resolver/start.bash &>> ${SCRIPT_INTERNAL_LOGFILE}
+    ufw allow 10011/tcp
+    ufw allow 7001/tcp
+    ufw allow 10013/tcp
+  fi
+
+  if [ "$EXCHANGE" == "B" ]; then
+    sed -i "s|localhost:7001|$VPSIP:7001|g" $RESOLVERPATH/exchange-b/resolver/start.bash &>> ${SCRIPT_INTERNAL_LOGFILE}
+    ufw allow 20011/tcp
+    ufw allow 7002/tcp
+    ufw allow 20013/tcp
+  fi
+}
+
+function whichExchange() {
+  echo -e "Which Exchange should be started?"
+  echo -e "1: Exchange A"
+  echo -e "2: Exchange B"
+
+  read -rp "" opt
+  case $opt in
+  "1") echo -e "Exchange A"
+     EXCHANGE='A'
+  ;;
+  "2") echo -e "Exchange B"
+     EXCHANGE='B'
+  ;;
+  *) echo -e "${RED}ERROR:${OFF} Invalid option"
+    exit
+  ;;
+   esac
 }
 
 function establishConnection() {
@@ -538,8 +646,6 @@ Waiting for LTC sync (${ltc_numCon::-1} Connections): ${ltc_actBlock::-1} / ${lt
 }
 
 function printNetworkStatus() {
-  checkSyncStatusLNWallets
-
   checkIfCoreWalletIsUpStatus $XSN_DAEMON $XSN_CODE_NAME $XSN_CONFIGFOLDER $XSN_CLIENT
   checkIfCoreWalletIsUpStatus $LTC_DAEMON $LTC_CODE_NAME $LTC_CONFIGFOLDER $LTC_CLIENT
 
@@ -636,9 +742,11 @@ function menu() {
 
   echo -e "════════════════════════════"
   echo -e "1: Install full setup"
-  echo -e "2: Start lightning network"
-  echo -e "3: Check network status"
-  echo -e "4: Exit"
+  echo -e "2: Start lightning network (Self-Swap)"
+  echo -e "3: Start lightning network (Swap with partner)"
+  echo -e "4: Check network status"
+  echo -e "5  Stop all the lightning daemons"
+  echo -e "6: Exit"
   echo -e "════════════════════════════"
 
   #PS3="Ihre Wahl : "
@@ -650,10 +758,16 @@ function menu() {
   "2") echo -e "Start lightning network.."
     doLightningNetwork
   ;;
-  "3") echo -e "Check sync and network status.."
+  "3") echo -e "Start lightning network.."
+    doLightningNetworkWithPartner
+  ;;
+  "4") echo -e "Check sync and network status.."
     printNetworkStatus
   ;;
-  "4") exit
+  "5") echo -e "Stopping all lightning daemons.."
+    ps aux | grep -ie lnd | awk '{print $2}' | xargs kill -9 &>> ${SCRIPT_INTERNAL_LOGFILE}
+  ;;
+  "6") exit
   ;;
 
   *) echo -e "${RED}ERROR:${OFF} Invalid option";;
