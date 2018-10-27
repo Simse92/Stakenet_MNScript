@@ -480,16 +480,16 @@ function configureExchange() {
 
   if [ "$EXCHANGE" == "A" ]; then
     sed -i "s|localhost:7002|$VPSIP:7002|g" $RESOLVERPATH/exchange-a/resolver/start.bash &>> ${SCRIPT_INTERNAL_LOGFILE}
-    ufw allow 10011/tcp
-    ufw allow 7001/tcp
-    ufw allow 10013/tcp
+    ufw allow 10011/tcp &>> ${SCRIPT_XB_XSN_LOGFILE}
+    ufw allow 7001/tcp &>> ${SCRIPT_XB_XSN_LOGFILE}
+    ufw allow 10013/tcp &>> ${SCRIPT_XB_XSN_LOGFILE}
   fi
 
   if [ "$EXCHANGE" == "B" ]; then
     sed -i "s|localhost:7001|$VPSIP:7001|g" $RESOLVERPATH/exchange-b/resolver/start.bash &>> ${SCRIPT_INTERNAL_LOGFILE}
-    ufw allow 20011/tcp
-    ufw allow 7002/tcp
-    ufw allow 20013/tcp
+    ufw allow 20011/tcp &>> ${SCRIPT_XB_XSN_LOGFILE}
+    ufw allow 7002/tcp &>> ${SCRIPT_XB_XSN_LOGFILE}
+    ufw allow 20013/tcp &>> ${SCRIPT_XB_XSN_LOGFILE}
   fi
 }
 
