@@ -1,10 +1,5 @@
 #!/bin/bash
 
-#Debug
-#COIN_GIT='https://github.com/X9Developers/XSN/releases/download/v1.0.13/xsn-1.0.13-linux64.tar.gz'
-#FILE_NAME_TAR='xsn-1.0.13-linux64.tar.gz'
-#FILE_NAME='xsn-1.0.13'
-
 #Update Wallet version
 SCRIPTVER=1.0.1
 SCRIPT_NAME='stakenet_mninstaller.sh'
