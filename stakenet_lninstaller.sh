@@ -1,7 +1,7 @@
 #!/bin/bash
 SCRIPTVER=1.0.1
 
-WALLET_TIMEOUT_S=60
+WALLET_TIMEOUT_S=120
 NETWORK=''
 EXCHANGE=''
 
@@ -160,6 +160,11 @@ function memorycheck() {
 
 }
 
+function printErrorLog() {
+  error=$( (cat $1/debug.log |grep Error) )
+  echo -e "$error"
+}
+
 
 function stopDaemon() {
   #PARAMS
@@ -194,7 +199,7 @@ function startGenWallet() {
 
   if [[ $retryCounter -ge $WALLET_TIMEOUT_S ]]; then
     echo -e "${RED}ERROR:${OFF}"
-    printErrorLog
+    printErrorLog $2
     exit
   else
     echo -e "$GREENTICK $1 wallet startup successful!"
@@ -406,8 +411,8 @@ function progressfilt ()
 }
 
 function checks() {
-  if [[ $( lsb_release -d ) != *16.04* ]] && [[ $( lsb_release -d ) != *18.04* ]]; then
-    echo -e "${RED}ERROR:${OFF} You are not running Ubuntu 16.04 or Ubuntu 18.04. Installation is cancelled."
+  if [[ $( lsb_release -d ) != *16.* ]] && [[ $( lsb_release -d ) != *18.* ]]; then
+    echo -e "${RED}ERROR:${OFF} You are not running Ubuntu 16 or Ubuntu 18. Installation is cancelled."
     exit 1
   fi
 
